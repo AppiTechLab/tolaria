@@ -1,6 +1,7 @@
 use crate::commands::expand_tilde;
 use crate::vault::filename_rules::validate_folder_name;
 use crate::vault::{self, FolderNode, VaultEntry};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use super::boundary::{
@@ -227,6 +228,31 @@ fn scan_visible_vault_folders(vault_path: &Path) -> Result<Vec<FolderNode>, Stri
         folders,
         crate::settings::hide_gitignored_files_enabled(),
     ))
+}
+
+fn load_all_markdown_content(vault_path: &Path) -> Result<HashMap<String, String>, String> {
+    let mut content_by_path = HashMap::new();
+    for entry in scan_visible_vault_entries(vault_path)? {
+        if entry.file_kind != "markdown" {
+            continue;
+        }
+
+        let content = vault::get_note_content(Path::new(&entry.path))?;
+        content_by_path.insert(entry.path, content);
+    }
+
+    Ok(content_by_path)
+}
+
+#[tauri::command]
+pub async fn get_all_content(vault_path: PathBuf) -> Result<HashMap<String, String>, String> {
+    tokio::task::spawn_blocking(move || {
+        with_requested_root_path(vault_path.as_path(), |requested_root| {
+            load_all_markdown_content(Path::new(requested_root))
+        })
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {e}"))?
 }
 
 /// Sync the `title` frontmatter field with the filename on note open.

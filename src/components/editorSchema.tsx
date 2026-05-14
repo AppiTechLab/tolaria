@@ -10,12 +10,14 @@ import { resolveWikilinkColor as resolveColor } from '../utils/wikilinkColors'
 import { resolveEntry } from '../utils/wikilink'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
+import { TASKS_BLOCK_TYPE, tasksFenceSource } from '../utils/tasksMarkdown'
 import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
 import type { VaultEntry } from '../types'
 import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
 import { SafeHtmlSpan } from './SafeMarkup'
+import { TasksQueryBlock } from './TasksQueryBlock'
 import { updateTldrawBlockPropsSafely } from './tldrawBlockProps'
 
 const TldrawWhiteboard = lazy(() => import('./TldrawWhiteboard').then(module => ({
@@ -144,6 +146,22 @@ function readMermaidPreElement(element: HTMLElement): { source: string; diagram:
   }
 }
 
+function readTasksPreElement(element: HTMLElement): { source: string; query: string } | undefined {
+  if (element.tagName !== 'PRE') return undefined
+  if (element.childElementCount !== 1 || element.firstElementChild?.tagName !== 'CODE') return undefined
+
+  const code = element.firstElementChild
+  if (readCodeElementLanguage(code) !== 'tasks') return undefined
+
+  const query = code.textContent?.endsWith('\n')
+    ? code.textContent
+    : `${code.textContent ?? ''}\n`
+  return {
+    query,
+    source: tasksFenceSource({ query }),
+  }
+}
+
 const MermaidBlock = createReactBlockSpec(
   {
     type: MERMAID_BLOCK_TYPE,
@@ -161,6 +179,24 @@ const MermaidBlock = createReactBlockSpec(
         diagram={props.block.props.diagram}
         source={props.block.props.source}
       />
+    ),
+  },
+)
+
+const TasksBlock = createReactBlockSpec(
+  {
+    type: TASKS_BLOCK_TYPE,
+    propSchema: {
+      source: { default: '' },
+      query: { default: '' },
+    },
+    content: 'none',
+  },
+  {
+    runsBefore: ['codeBlock'],
+    parse: readTasksPreElement,
+    render: (props) => (
+      <TasksQueryBlock query={props.block.props.query} />
     ),
   },
 )
@@ -216,6 +252,7 @@ const TldrawBlock = createReactBlockSpec(
 const codeBlock = createCodeBlockSpec(createTolariaCodeBlockOptions())
 const mathBlock = MathBlock()
 const mermaidBlock = MermaidBlock()
+const tasksBlock = TasksBlock()
 const tldrawBlock = TldrawBlock()
 
 export const schema = BlockNoteSchema.create({
@@ -228,6 +265,7 @@ export const schema = BlockNoteSchema.create({
   blockSpecs: {
     mathBlock,
     mermaidBlock,
+    tasksBlock,
     tldrawBlock,
     codeBlock,
   },

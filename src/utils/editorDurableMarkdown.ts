@@ -7,10 +7,12 @@ import {
 } from './durableMarkdownBlocks'
 import { serializeMathAwareBlocks } from './mathMarkdown'
 import { mermaidMarkdownCodec } from './mermaidMarkdown'
+import { tasksMarkdownCodec } from './tasksMarkdown'
 import { tldrawMarkdownCodec } from './tldrawMarkdown'
 
 const EDITOR_DURABLE_MARKDOWN_CODECS = [
   mermaidMarkdownCodec,
+  tasksMarkdownCodec,
   tldrawMarkdownCodec,
 ] as const
 

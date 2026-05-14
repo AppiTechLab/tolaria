@@ -167,6 +167,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_all_content_returns_only_markdown_notes() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let vault_path = dir.path();
+        let markdown = vault_path.join("alpha.md");
+        let nested_dir = vault_path.join("nested");
+        let nested_markdown = nested_dir.join("beta.md");
+        let text_note = vault_path.join("notes.txt");
+
+        std::fs::create_dir_all(&nested_dir).unwrap();
+        std::fs::write(&markdown, "# Alpha\n").unwrap();
+        std::fs::write(&nested_markdown, "# Beta\n").unwrap();
+        std::fs::write(&text_note, "plain text\n").unwrap();
+
+        let content = get_all_content(vault_path.to_path_buf()).await.unwrap();
+
+        assert_eq!(content.len(), 2);
+        assert_eq!(content.get(&markdown.to_string_lossy().to_string()), Some(&"# Alpha\n".to_string()));
+        assert_eq!(content.get(&nested_markdown.to_string_lossy().to_string()), Some(&"# Beta\n".to_string()));
+        assert!(!content.contains_key(&text_note.to_string_lossy().to_string()));
+    }
+
+    #[tokio::test]
     async fn test_save_note_content_rejects_traversal_outside_active_vault() {
         let dir = tempfile::TempDir::new().unwrap();
         let vault_path = dir.path();

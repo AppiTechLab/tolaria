@@ -49,6 +49,7 @@ import { TolariaSideMenu } from './tolariaBlockNoteSideMenu'
 import { useEditorLinkActivation } from './useEditorLinkActivation'
 import { findNearestTextCursorBlock } from './blockNoteCursorTarget'
 import { ImageLightbox } from './ImageLightbox'
+import { TasksBlockContext } from './tasksBlockContext'
 import { ActionTooltip } from './ui/action-tooltip'
 import { Button } from './ui/button'
 import {
@@ -1374,27 +1375,29 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
           <div className="editor__drop-overlay-label">Drop image here</div>
         </div>
       )}
-      <BlockNoteRenderRecoveryBoundary onRecover={() => repairEditorDocumentForRenderRecovery(editor)}>
-        {(recoveryKey) => (
-          <SharedContextBlockNoteView
-            key={recoveryKey}
-            editor={editor}
-            theme={themeMode}
-            onChange={handleEditorChange}
-            editable={editable}
-            formattingToolbar={false}
-            linkToolbar={false}
-            slashMenu={false}
-            sideMenu={false}
-          >
-            <EditorInteractionControllers
-              {...suggestionMenuItems}
-              runEditorAction={runEditorAction}
-              vaultPath={vaultPath}
-            />
-          </SharedContextBlockNoteView>
-        )}
-      </BlockNoteRenderRecoveryBoundary>
+      <TasksBlockContext.Provider value={{ entries, locale, onNavigateWikilink, vaultPath }}>
+        <BlockNoteRenderRecoveryBoundary onRecover={() => repairEditorDocumentForRenderRecovery(editor)}>
+          {(recoveryKey) => (
+            <SharedContextBlockNoteView
+              key={recoveryKey}
+              editor={editor}
+              theme={themeMode}
+              onChange={handleEditorChange}
+              editable={editable}
+              formattingToolbar={false}
+              linkToolbar={false}
+              slashMenu={false}
+              sideMenu={false}
+            >
+              <EditorInteractionControllers
+                {...suggestionMenuItems}
+                runEditorAction={runEditorAction}
+                vaultPath={vaultPath}
+              />
+            </SharedContextBlockNoteView>
+          )}
+        </BlockNoteRenderRecoveryBoundary>
+      </TasksBlockContext.Provider>
       {copyTarget && <CodeBlockCopyButton copyTarget={copyTarget} locale={locale} />}
       <ImageLightbox image={lightbox.image} locale={locale} onClose={lightbox.close} />
     </div>

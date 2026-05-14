@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MERMAID_BLOCK_TYPE } from '../utils/mermaidMarkdown'
+import { TASKS_BLOCK_TYPE } from '../utils/tasksMarkdown'
 import { TLDRAW_BLOCK_TYPE } from '../utils/tldrawMarkdown'
 import { serializeEditorDocumentToMarkdown, syncActiveTabIntoRawBuffer } from './editorRawModeSync'
 
@@ -63,5 +64,31 @@ describe('editorRawModeSync Mermaid serialization', () => {
 
     expect(synced).toContain('```tldraw id="planning-map" height="520"')
     expect(rawLatestContentRef.current).toBe(synced)
+  })
+
+  it('keeps the original fenced tasks source when rich content enters raw mode', () => {
+    const source = [
+      '```tasks',
+      'not done',
+      'sort by due reverse',
+      '```',
+    ].join('\n')
+    const editor = {
+      document: [{
+        id: 'tasks-1',
+        type: TASKS_BLOCK_TYPE,
+        props: {
+          source,
+          query: 'not done\nsort by due reverse\n',
+        },
+        children: [],
+      }],
+      blocksToMarkdownLossy: vi.fn(),
+    }
+
+    expect(serializeEditorDocumentToMarkdown(
+      editor as never,
+      '---\ntitle: Tasks\n---\n\n# Tasks\n',
+    )).toBe(`---\ntitle: Tasks\n---\n${source}\n`)
   })
 })
