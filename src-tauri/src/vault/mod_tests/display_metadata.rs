@@ -152,3 +152,28 @@ Priority: High
         assert_string_property(&entry, key, value);
     }
 }
+
+#[test]
+fn test_extract_properties_preserves_non_wikilink_string_arrays() {
+    let dir = TempDir::new().unwrap();
+    let content = r#"---
+Is A: Note
+Tags:
+  - alpha
+  - beta
+People: [Luca, Marta]
+---
+# Tagged note
+"#;
+
+    let entry = parse_test_entry(&dir, "tagged.md", content);
+
+    assert_eq!(
+        entry.properties.get("Tags"),
+        Some(&serde_json::json!(["alpha", "beta"]))
+    );
+    assert_eq!(
+        entry.properties.get("People"),
+        Some(&serde_json::json!(["Luca", "Marta"]))
+    );
+}

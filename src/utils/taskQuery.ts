@@ -318,7 +318,7 @@ function parseTaskQueryLine(line: string, query: TaskQueryDefinition, referenceD
     return
   }
 
-  const dateMatch = /^(due|scheduled|done)\s+(before|after|on|on or before|on or after)\s+(.+)$/iu.exec(trimmed)
+  const dateMatch = /^(due|scheduled|done)\s+(on or before|on or after|before|after|on)\s+(.+)$/iu.exec(trimmed)
   if (dateMatch?.[1] && dateMatch[2] && dateMatch[3]) {
     const field = parseDateField(dateMatch[1])
     const operator = parseDateOperator(dateMatch[2])
