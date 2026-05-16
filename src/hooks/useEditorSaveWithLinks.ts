@@ -1,6 +1,6 @@
 import { startTransition, useCallback, useRef, type MutableRefObject } from 'react'
 import { useEditorSave } from './useEditorSave'
-import { extractOutgoingLinks, extractSnippet, countWords, splitFrontmatter } from '../utils/wikilinks'
+import { extractOutgoingLinks, extractSnippet, countWords, splitFrontmatter, extractInlineTags } from '../utils/wikilinks'
 import { deriveRawEditorEntryState } from './rawEditorEntryState'
 import { deriveDisplayTitleState } from '../utils/noteTitle'
 import { detectFrontmatterState } from '../utils/frontmatter'
@@ -16,9 +16,10 @@ function shouldSyncFrontmatterState(content: string): boolean {
   return !(frontmatterState === 'none' && content.startsWith('---\n'))
 }
 
-function frontmatterSyncKey(content: string): string | null {
+function derivedMetadataSyncKey(content: string): string | null {
   if (!shouldSyncFrontmatterState(content)) return null
-  return splitFrontmatter(content)[0]
+  const [frontmatter] = splitFrontmatter(content)
+  return `${frontmatter}\u0001${extractInlineTags(content).join('\u0000')}`
 }
 
 function syncOutgoingLinks(options: {
@@ -41,10 +42,10 @@ function resolveFrontmatterPatch(options: {
   prevFmSourceRef: MutableRefObject<string | null>
 }): Partial<VaultEntry> | null {
   const { content, prevFmSourceRef } = options
-  const fmSource = frontmatterSyncKey(content)
-  if (fmSource === null || fmSource === prevFmSourceRef.current) return null
+  const derivedSource = derivedMetadataSyncKey(content)
+  if (derivedSource === null || derivedSource === prevFmSourceRef.current) return null
 
-  prevFmSourceRef.current = fmSource
+  prevFmSourceRef.current = derivedSource
   return deriveRawEditorEntryState(content)
 }
 

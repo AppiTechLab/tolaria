@@ -1,8 +1,8 @@
-import type { VaultEntry, ViewDefinition, FilterGroup, FilterNode, FilterCondition } from '../types'
+import type { VaultEntry, ViewDefinition, FilterGroup, FilterNode, FilterCondition, VaultPropertyValue } from '../types'
 import { toDateFilterTimestamp } from './filterDates'
 import { compileSafeUserRegex } from './safeRegex'
 
-type ResolvedField = { scalar?: string | number | boolean | null; array?: string[] }
+type ResolvedField = { scalar?: Exclude<VaultPropertyValue, string[]>; array?: string[] }
 type BuiltInFieldReader = (entry: VaultEntry) => ResolvedField
 type TextOp = FilterCondition['op']
 
@@ -48,7 +48,11 @@ function resolveRelationshipField(entry: VaultEntry, lower: string): ResolvedFie
 
 function resolvePropertyField(entry: VaultEntry, lower: string): ResolvedField | null {
   const propKey = findCaseInsensitiveKey(entry.properties, lower)
-  return propKey ? { scalar: Reflect.get(entry.properties, propKey) as ResolvedField['scalar'] } : null
+  if (!propKey) return null
+  const value = Reflect.get(entry.properties, propKey) as VaultPropertyValue
+  return Array.isArray(value)
+    ? { array: value.map(toString) }
+    : { scalar: value }
 }
 
 function resolveField(entry: VaultEntry, field: string): ResolvedField {

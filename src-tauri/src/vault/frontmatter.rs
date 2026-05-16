@@ -310,13 +310,9 @@ pub(crate) fn extract_properties(
             serde_json::Value::Number(_) | serde_json::Value::Bool(_) => {
                 properties.insert(key.clone(), value.clone());
             }
-            // Handle single-element arrays: unwrap to scalar.
-            // This ensures YAML like "Owner: [Luca]" or "Owner:\n  - Luca" works correctly.
             serde_json::Value::Array(arr) => {
-                if let [serde_json::Value::String(s)] = arr.as_slice() {
-                    if !contains_wikilink(s) {
-                        properties.insert(key.clone(), serde_json::Value::String(s.clone()));
-                    }
+                if arr.iter().all(|item| matches!(item, serde_json::Value::String(s) if !contains_wikilink(s))) {
+                    properties.insert(key.clone(), value.clone());
                 }
             }
             _ => {}

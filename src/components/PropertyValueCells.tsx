@@ -126,8 +126,8 @@ function StatusValue({ propKey, value, isEditing, vaultStatuses, onSave, onStart
   )
 }
 
-function TagsValue({ propKey, value, isEditing, vaultTags, onSave, onStartEdit }: {
-  propKey: string; value: string[]; isEditing: boolean; vaultTags: string[]
+function TagsValue({ propKey, value, isEditing, vaultTags, showSuggestedTags = false, readOnly = false, onSave, onStartEdit }: {
+  propKey: string; value: string[]; isEditing: boolean; vaultTags: string[]; showSuggestedTags?: boolean; readOnly?: boolean
   onSave: (key: string, items: string[]) => void; onStartEdit: (key: string | null) => void
 }) {
   const handleToggle = useCallback((tag: string) => {
@@ -139,6 +139,10 @@ function TagsValue({ propKey, value, isEditing, vaultTags, onSave, onStartEdit }
   const handleRemove = useCallback((tag: string) => {
     onSave(propKey, value.filter(t => t !== tag))
   }, [propKey, value, onSave])
+
+  const suggestedTags = showSuggestedTags && !readOnly
+    ? vaultTags.filter(tag => !value.includes(tag))
+    : []
 
   return (
     <span className="relative inline-flex min-w-0 flex-wrap items-center gap-1">
@@ -160,33 +164,93 @@ function TagsValue({ propKey, value, isEditing, vaultTags, onSave, onStartEdit }
             >
               {tag}
             </span>
-            <button
-              className="ml-0.5 max-w-0 overflow-hidden border-none bg-transparent p-0 leading-none opacity-0 transition-all duration-150 group-hover/tag:max-w-[14px] group-hover/tag:opacity-100"
-              style={{ color: style.color, fontSize: 11, flexShrink: 0 }}
-              onClick={() => handleRemove(tag)}
-              title={`Remove ${tag}`}
-            >
-              &times;
-            </button>
+            {!readOnly && (
+              <button
+                className="ml-0.5 max-w-0 overflow-hidden border-none bg-transparent p-0 leading-none opacity-0 transition-all duration-150 group-hover/tag:max-w-[14px] group-hover/tag:opacity-100"
+                style={{ color: style.color, fontSize: 11, flexShrink: 0 }}
+                onClick={() => handleRemove(tag)}
+                title={`Remove ${tag}`}
+              >
+                &times;
+              </button>
+            )}
           </span>
         )
       })}
-      <button
-        className="inline-flex shrink-0 items-center justify-center border-none bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-        style={PROPERTY_CHIP_STYLE}
-        onClick={() => onStartEdit(propKey)}
-        title="Add tag"
-        data-testid="tags-add-button"
-      >+</button>
-      {isEditing && (
-        <TagsDropdown
-          selectedTags={value}
-          vaultTags={vaultTags}
-          onToggle={handleToggle}
-          onClose={() => onStartEdit(null)}
-        />
+      {suggestedTags.map(tag => {
+        const style = getTagStyle(tag)
+        return (
+          <button
+            key={tag}
+            type="button"
+            className="inline-flex shrink-0 items-center border-none transition-opacity hover:opacity-80"
+            style={{ ...PROPERTY_CHIP_STYLE, backgroundColor: style.bg, color: style.color, opacity: 0.75 }}
+            onClick={() => handleToggle(tag)}
+            title={`Add ${tag}`}
+          >
+            {tag}
+          </button>
+        )
+      })}
+      {!readOnly && (
+        <>
+          <button
+            className="inline-flex shrink-0 items-center justify-center border-none bg-muted text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            style={PROPERTY_CHIP_STYLE}
+            onClick={() => onStartEdit(propKey)}
+            title="Add tag"
+            data-testid="tags-add-button"
+          >+</button>
+          {isEditing && (
+            <TagsDropdown
+              selectedTags={value}
+              vaultTags={vaultTags}
+              onToggle={handleToggle}
+              onClose={() => onStartEdit(null)}
+            />
+          )}
+        </>
       )}
     </span>
+  )
+}
+
+function toTagItems(value: FrontmatterValue): string[] {
+  if (Array.isArray(value)) return value.map(String)
+  if (value === null || value === undefined || value === '') return []
+  return [String(value)]
+}
+
+export function TagPropertyValueCell({
+  propKey,
+  value,
+  isEditing,
+  vaultTags,
+  showSuggestedTags = false,
+  readOnly = false,
+  onSaveList,
+  onStartEdit,
+}: {
+  propKey: string
+  value: FrontmatterValue
+  isEditing: boolean
+  vaultTags: string[]
+  showSuggestedTags?: boolean
+  readOnly?: boolean
+  onSaveList: (key: string, items: string[]) => void
+  onStartEdit: (key: string | null) => void
+}) {
+  return (
+    <TagsValue
+      propKey={propKey}
+      value={toTagItems(value)}
+      isEditing={isEditing}
+      vaultTags={vaultTags}
+      showSuggestedTags={showSuggestedTags}
+      readOnly={readOnly}
+      onSave={onSaveList}
+      onStartEdit={onStartEdit}
+    />
   )
 }
 
@@ -575,12 +639,12 @@ const SCALAR_DISPLAY_RENDERERS: readonly [PropertyDisplayMode, ScalarDisplayRend
     />
   )],
   ['tags', (props) => (
-    <TagsValue
+    <TagPropertyValueCell
       propKey={props.propKey}
-      value={props.value ? [String(props.value)] : []}
+      value={props.value}
       isEditing={props.isEditing}
       vaultTags={props.vaultTags}
-      onSave={props.onSaveList}
+      onSaveList={props.onSaveList}
       onStartEdit={props.onStartEdit}
     />
   )],
@@ -630,7 +694,7 @@ export function SmartPropertyValueCell(props: SmartCellProps) {
   const { propKey, value, displayMode, isEditing, vaultTags, onSaveList, onStartEdit } = props
   if (Array.isArray(value)) {
     if (displayMode === 'tags') {
-      return <TagsValue propKey={propKey} value={value.map(String)} isEditing={isEditing} vaultTags={vaultTags} onSave={onSaveList} onStartEdit={onStartEdit} />
+      return <TagPropertyValueCell propKey={propKey} value={value} isEditing={isEditing} vaultTags={vaultTags} onSaveList={onSaveList} onStartEdit={onStartEdit} />
     }
     return <TagPillList items={value.map(String)} onSave={(items) => onSaveList(propKey, items)} label={propKey} />
   }

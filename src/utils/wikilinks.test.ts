@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { preProcessWikilinks, injectWikilinks, restoreWikilinksInBlocks, splitFrontmatter, countWords, extractOutgoingLinks, extractBacklinkContext, extractSnippet } from './wikilinks'
+import { preProcessWikilinks, injectWikilinks, restoreWikilinksInBlocks, splitFrontmatter, countWords, extractOutgoingLinks, extractInlineTags, extractBacklinkContext, extractSnippet } from './wikilinks'
 
 interface TestBlock {
   type?: string
@@ -494,6 +494,18 @@ describe('extractOutgoingLinks', () => {
   it('ignores empty wikilinks', () => {
     const content = 'Text [[]] and [[Valid]]'
     expect(extractOutgoingLinks(content)).toEqual(['Valid'])
+  })
+})
+
+describe('extractInlineTags', () => {
+  it('extracts hierarchical inline tags from note body and deduplicates them', () => {
+    const content = '---\ntags: [frontmatter]\n---\n# Title\n\nWorking on #alpha and #tag/test and #alpha again.'
+    expect(extractInlineTags(content)).toEqual(['alpha', 'tag/test'])
+  })
+
+  it('ignores headings, code spans, fenced code, and url fragments', () => {
+    const content = '# Heading\n\nUse `#not/code` inline.\n\n```md\n#not/in-fence\n```\n\nVisit https://example.com/#fragment and keep #yes/ok.'
+    expect(extractInlineTags(content)).toEqual(['yes/ok'])
   })
 })
 

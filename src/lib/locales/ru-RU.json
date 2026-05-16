@@ -510,6 +510,7 @@
   "inspector.properties.pickDate": "Выберите дату…",
   "inspector.properties.valuePlaceholder": "Значение",
   "inspector.properties.propertyName": "Название свойства",
+  "inspector.tags.title": "Теги",
   "inspector.relationship.add": "Добавить",
   "inspector.relationship.addRelationship": "+ Добавить связь",
   "inspector.relationship.name": "Название связи",

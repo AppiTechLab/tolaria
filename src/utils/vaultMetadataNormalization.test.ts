@@ -37,4 +37,28 @@ describe('normalizeVaultEntries', () => {
       title: 'Valid',
     })
   })
+
+  it('preserves string-array properties from loaded entries', () => {
+    const entries = normalizeVaultEntries([
+      {
+        path: '/vault/tagged.md',
+        filename: 'tagged.md',
+        title: 'Tagged',
+        properties: {
+          tags: ['alpha', 'beta', 'PM/assign/widmera'],
+          People: ['Luca'],
+          score: 3,
+        },
+      },
+    ], '/vault')
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({
+      properties: {
+        tags: ['alpha', 'beta', 'PM/assign/widmera'],
+        People: ['Luca'],
+        score: 3,
+      },
+    })
+  })
 })

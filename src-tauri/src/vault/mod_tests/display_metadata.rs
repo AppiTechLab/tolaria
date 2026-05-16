@@ -177,3 +177,23 @@ People: [Luca, Marta]
         Some(&serde_json::json!(["Luca", "Marta"]))
     );
 }
+
+#[test]
+fn test_extract_properties_merges_inline_body_tags() {
+    let dir = TempDir::new().unwrap();
+    let content = r#"---
+tags:
+  - frontmatter
+---
+# Tagged note
+
+Working on #alpha/test and #deep-work and #frontmatter.
+"#;
+
+    let entry = parse_test_entry(&dir, "tagged-inline.md", content);
+
+    assert_eq!(
+        entry.properties.get("tags"),
+        Some(&serde_json::json!(["frontmatter", "alpha/test", "deep-work"]))
+    );
+}

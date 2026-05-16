@@ -12,6 +12,7 @@ import {
   GitHistoryPanel,
   InstancesPanel,
   NoteInfoPanel,
+  TagsPanel,
 } from './InspectorPanels'
 import { normalizeNotePathForIdentity } from '../utils/notePathIdentity'
 import type { ReferencedByItem } from './InspectorPanels'
@@ -123,6 +124,15 @@ function ValidFrontmatterPanels({
         onCreateMissingType={onCreateMissingType}
         onChangeWorkspace={onChangeWorkspace ? (workspace) => onChangeWorkspace(entryForWorkspaceActions, workspace) : undefined}
         workspaces={workspaces}
+        locale={locale}
+      />
+      <TagsPanel
+        entry={entry}
+        frontmatter={frontmatter}
+        entries={entries}
+        onUpdateProperty={onUpdateProperty}
+        onDeleteProperty={onDeleteProperty}
+        onAddProperty={onAddProperty}
         locale={locale}
       />
       <Separator data-testid="inspector-properties-relationships-separator" />

@@ -96,6 +96,18 @@ describe('parseFrontmatter', () => {
     expect(fm['start date']).toBe('')
     expect(fm['rating']).toBe('')
   })
+
+  it('preserves single-item YAML lists as arrays', () => {
+    const fm = parseFrontmatter('---\nTags:\n  - alpha\n---\nBody')
+
+    expect(fm['Tags']).toEqual(['alpha'])
+  })
+
+  it('parses empty inline arrays as empty arrays', () => {
+    const fm = parseFrontmatter('---\ntags: []\n---\nBody')
+
+    expect(fm['tags']).toEqual([])
+  })
 })
 
 describe('detectFrontmatterState', () => {

@@ -510,6 +510,7 @@
   "inspector.properties.pickDate": "選擇日期…",
   "inspector.properties.valuePlaceholder": "值",
   "inspector.properties.propertyName": "屬性名稱",
+  "inspector.tags.title": "標籤",
   "inspector.relationship.add": "新增",
   "inspector.relationship.addRelationship": "+ 新增關係",
   "inspector.relationship.name": "關係名稱",

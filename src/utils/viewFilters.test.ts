@@ -126,6 +126,21 @@ describe('evaluateView', () => {
     expect(result.map((e) => e.title)).toEqual(['Match'])
   })
 
+  it('filters by string-array property fields', () => {
+    const view: ViewDefinition = {
+      name: 'By tag', icon: null, color: null, sort: null,
+      filters: { all: [{ field: 'Tags', op: 'contains', value: 'alpha' }] },
+    }
+    const entries = [
+      makeEntry({ title: 'Match', properties: { Tags: ['alpha', 'beta'] } }),
+      makeEntry({ title: 'Other', properties: { Tags: ['gamma'] } }),
+      makeEntry({ title: 'None', properties: {} }),
+    ]
+
+    const result = evaluateView(view, entries)
+    expect(result.map((e) => e.title)).toEqual(['Match'])
+  })
+
   it('filters with any_of operator', () => {
     const view: ViewDefinition = {
       name: 'Multi', icon: null, color: null, sort: null,

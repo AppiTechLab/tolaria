@@ -50,7 +50,7 @@ pub use views::{
 
 use file::read_file_metadata;
 use frontmatter::{extract_fm_and_rels, resolve_is_a, resolve_note_width};
-use parsing::{count_body_words, extract_outgoing_links, extract_snippet, extract_title};
+use parsing::{count_body_words, extract_inline_tags, extract_outgoing_links, extract_snippet, extract_title};
 
 use gray_matter::engine::YAML;
 use gray_matter::Matter;
@@ -68,6 +68,49 @@ fn preferred_relationship_refs(
         .cloned()
         .or_else(|| relationships.get(legacy_key).cloned())
         .unwrap_or_default()
+}
+
+fn normalize_tag_property_items(value: Option<&serde_json::Value>) -> Vec<String> {
+    match value {
+        Some(serde_json::Value::Array(items)) => items
+            .iter()
+            .filter_map(|item| item.as_str().map(str::to_string))
+            .collect(),
+        Some(serde_json::Value::String(tag)) if !tag.trim().is_empty() => vec![tag.clone()],
+        _ => Vec::new(),
+    }
+}
+
+fn merge_inline_tags_into_properties(
+    properties: &mut std::collections::HashMap<String, serde_json::Value>,
+    inline_tags: &[String],
+) {
+    if inline_tags.is_empty() {
+        return;
+    }
+
+    let tag_key = properties
+        .keys()
+        .find(|key| key.eq_ignore_ascii_case("tags"))
+        .cloned()
+        .unwrap_or_else(|| "Tags".to_string());
+    let mut merged = normalize_tag_property_items(properties.get(&tag_key));
+
+    for tag in inline_tags {
+        if !merged.iter().any(|existing| existing == tag) {
+            merged.push(tag.clone());
+        }
+    }
+
+    properties.insert(
+        tag_key,
+        serde_json::Value::Array(
+            merged
+                .into_iter()
+                .map(serde_json::Value::String)
+                .collect(),
+        ),
+    );
 }
 
 pub(crate) fn derive_markdown_title_from_content(content: &str, filename: &str) -> String {
@@ -107,7 +150,9 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
 
     let matter = Matter::<YAML>::new();
     let parsed = matter.parse(&content);
-    let (frontmatter, mut relationships, properties) = extract_fm_and_rels(parsed.data, &content);
+    let (frontmatter, mut relationships, mut properties) = extract_fm_and_rels(parsed.data, &content);
+    let inline_tags = extract_inline_tags(&parsed.content);
+    merge_inline_tags_into_properties(&mut properties, &inline_tags);
 
     let title = derive_markdown_title_from_content(&content, &filename);
     let has_h1 = parsing::extract_h1_title(&content).is_some();

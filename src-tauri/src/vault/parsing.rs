@@ -77,6 +77,113 @@ fn strip_frontmatter(content: &str) -> &str {
     }
 }
 
+fn is_markdown_fence(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.starts_with("```") || trimmed.starts_with("~~~")
+}
+
+fn is_markdown_heading(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    let hashes = trimmed.chars().take_while(|c| *c == '#').count();
+    (1..=6).contains(&hashes) && trimmed.chars().nth(hashes) == Some(' ')
+}
+
+fn strip_inline_code(line: &str) -> String {
+    let mut result = String::with_capacity(line.len());
+    let mut in_code = false;
+
+    for ch in line.chars() {
+        if ch == '`' {
+            in_code = !in_code;
+            result.push(' ');
+            continue;
+        }
+
+        if in_code {
+            result.push(' ');
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
+fn is_inline_tag_boundary(prev: Option<char>) -> bool {
+    !matches!(prev, Some(c) if c.is_ascii_alphanumeric() || c == '_' || c == '/')
+}
+
+fn is_inline_tag_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_' || ch == '-' || ch == '/'
+}
+
+fn is_valid_inline_tag_segment(segment: &str) -> bool {
+    let mut chars = segment.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !first.is_ascii_alphanumeric() {
+        return false;
+    }
+    segment
+        .chars()
+        .last()
+        .is_some_and(|last| last.is_ascii_alphanumeric())
+        && segment
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+}
+
+fn is_valid_inline_tag(tag: &str) -> bool {
+    !tag.is_empty() && tag.split('/').all(is_valid_inline_tag_segment)
+}
+
+fn collect_inline_tags_from_line(line: &str, tags: &mut Vec<String>) {
+    let searchable = strip_inline_code(line);
+    let chars: Vec<(usize, char)> = searchable.char_indices().collect();
+    let mut index = 0;
+
+    while index < chars.len() {
+        let (byte_index, ch) = chars[index];
+        if ch != '#' {
+            index += 1;
+            continue;
+        }
+
+        let prev = if index == 0 {
+            None
+        } else {
+            Some(chars[index - 1].1)
+        };
+        if !is_inline_tag_boundary(prev) {
+            index += 1;
+            continue;
+        }
+
+        let start = byte_index + ch.len_utf8();
+        let mut end = start;
+        let mut cursor = index + 1;
+
+        while cursor < chars.len() {
+            let (next_byte, next_ch) = chars[cursor];
+            if !is_inline_tag_char(next_ch) {
+                break;
+            }
+            end = next_byte + next_ch.len_utf8();
+            cursor += 1;
+        }
+
+        if end > start {
+            let candidate = &searchable[start..end];
+            if is_valid_inline_tag(candidate) && !tags.iter().any(|tag| tag == candidate) {
+                tags.push(candidate.to_string());
+            }
+        }
+
+        index = cursor.max(index + 1);
+    }
+}
+
 /// Check if a line is useful for snippet extraction (not blank, heading, code fence, or rule).
 fn is_snippet_line(line: &str) -> bool {
     let t = line.trim();
@@ -317,6 +424,24 @@ pub(super) fn extract_outgoing_links(content: &str) -> Vec<String> {
     links.sort();
     links.dedup();
     links
+}
+
+pub(super) fn extract_inline_tags(content: &str) -> Vec<String> {
+    let mut tags = Vec::new();
+    let mut in_fence = false;
+
+    for line in strip_frontmatter(content).lines() {
+        if is_markdown_fence(line) {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence || is_markdown_heading(line) {
+            continue;
+        }
+        collect_inline_tags_from_line(line, &mut tags);
+    }
+
+    tags
 }
 
 #[cfg(test)]
@@ -865,5 +990,19 @@ mod tests {
         let content = "[[unclosed and [[valid]]";
         let links = extract_outgoing_links(content);
         assert_eq!(links, vec!["unclosed and [[valid"]);
+    }
+
+    #[test]
+    fn test_extract_inline_tags_hierarchical_and_deduplicated() {
+        let content = "# Title\n\nWorking on #alpha and #tag/test and #alpha again.";
+        let tags = extract_inline_tags(content);
+        assert_eq!(tags, vec!["alpha".to_string(), "tag/test".to_string()]);
+    }
+
+    #[test]
+    fn test_extract_inline_tags_ignores_headings_code_and_url_fragments() {
+        let content = "# Heading\n\nUse `#not/code` inline.\n\n```md\n#not/in-fence\n```\n\nVisit https://example.com/#fragment and keep #yes/ok.";
+        let tags = extract_inline_tags(content);
+        assert_eq!(tags, vec!["yes/ok".to_string()]);
     }
 }

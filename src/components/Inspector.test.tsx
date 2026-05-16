@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactElement } from 'react'
-import { render as rtlRender, screen, fireEvent } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { Inspector } from './Inspector'
 import type { VaultEntry, GitCommit, WorkspaceIdentity } from '../types'
@@ -181,6 +181,70 @@ Status: Evergreened
     expect(screen.getByText('Type')).toBeInTheDocument()
     expect(screen.getByText('Status')).toBeInTheDocument()
     expect(screen.getByText('Words')).toBeInTheDocument()
+  })
+
+  it('shows a dedicated tags panel with note and vault tag groups', () => {
+    renderSelectedInspector({
+      entries: [
+        {
+          ...referrerEntry,
+          path: '/vault/note/tag-source.md',
+          filename: 'tag-source.md',
+          title: 'Tag Source',
+          properties: {
+            Tags: ['React', 'Vitest'],
+            Labels: 'Solo',
+          },
+        },
+      ],
+    })
+
+    const tagsPanel = screen.getByTestId('inspector-tags-panel')
+
+    expect(within(tagsPanel).getByRole('heading', { name: 'Tags' })).toBeInTheDocument()
+    expect(within(tagsPanel).getByText('Vitest')).toBeInTheDocument()
+    expect(within(tagsPanel).getByText('Labels')).toBeInTheDocument()
+    expect(within(tagsPanel).getByText('Solo')).toBeInTheDocument()
+  })
+
+  it('shows inline hashtag tags from the current entry in the dedicated tags panel', () => {
+    renderSelectedInspector({
+      entry: {
+        ...mockEntry,
+        properties: {
+          Tags: ['alpha/test', 'deep-work'],
+        },
+      },
+      content: `---
+title: Test Project
+is_a: Project
+---
+
+# Test Project
+
+Working on #alpha/test and #deep-work today.
+`,
+    })
+
+    const tagsPanel = screen.getByTestId('inspector-tags-panel')
+
+    expect(within(tagsPanel).getByText('alpha/test')).toBeInTheDocument()
+    expect(within(tagsPanel).getByText('deep-work')).toBeInTheDocument()
+  })
+
+  it('hides the dedicated tags panel when the note and vault have no tag properties', () => {
+    const content = `---
+title: Test Project
+is_a: Project
+Status: Active
+---
+
+# Test Project
+`
+
+    renderSelectedInspector({ content, entries: [] })
+
+    expect(screen.queryByTestId('inspector-tags-panel')).not.toBeInTheDocument()
   })
 
   it('renders status as a colored badge with dot indicator', () => {

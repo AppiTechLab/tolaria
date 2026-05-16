@@ -510,6 +510,7 @@
   "inspector.properties.pickDate": "날짜 선택…",
   "inspector.properties.valuePlaceholder": "값",
   "inspector.properties.propertyName": "속성 이름",
+  "inspector.tags.title": "태그",
   "inspector.relationship.add": "추가",
   "inspector.relationship.addRelationship": "+ 관계 추가",
   "inspector.relationship.name": "관계 이름",

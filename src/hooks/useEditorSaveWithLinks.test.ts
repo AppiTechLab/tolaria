@@ -218,6 +218,26 @@ describe('useEditorSaveWithLinks', () => {
     }))
   })
 
+  it('syncs inline hashtag tags from note body into properties immediately', () => {
+    const { result } = renderHookWithLinks()
+
+    act(() => {
+      result.current.handleContentChange('/note.md', '# Note\n\nWorking on #tag/test and #deep-work today.')
+    })
+
+    expect(updateEntry).toHaveBeenCalledWith('/note.md', expect.objectContaining({
+      properties: { Tags: ['tag/test', 'deep-work'] },
+    }))
+
+    const callCount = updateEntry.mock.calls.length
+
+    act(() => {
+      result.current.handleContentChange('/note.md', '# Note\n\nDifferent words, same #tag/test and #deep-work tags.')
+    })
+
+    expect(updateEntry).toHaveBeenCalledTimes(callCount)
+  })
+
   it('clears stale note-list and inspector metadata when raw frontmatter is removed', () => {
     const { result } = renderHookWithLinks()
 

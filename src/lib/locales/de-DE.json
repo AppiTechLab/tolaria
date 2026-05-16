@@ -510,6 +510,7 @@
   "inspector.properties.pickDate": "Datum auswählen …",
   "inspector.properties.valuePlaceholder": "Wert",
   "inspector.properties.propertyName": "Eigenschaftsname",
+  "inspector.tags.title": "Tags",
   "inspector.relationship.add": "Hinzufügen",
   "inspector.relationship.addRelationship": "+ Beziehung hinzufügen",
   "inspector.relationship.name": "Beziehungsname",

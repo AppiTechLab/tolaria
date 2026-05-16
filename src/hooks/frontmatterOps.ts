@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
-import type { VaultEntry } from '../types'
+import type { VaultEntry, VaultPropertyValue } from '../types'
 import type { FrontmatterValue } from '../components/Inspector'
 import { updateMockFrontmatter, deleteMockFrontmatterProperty } from './mockFrontmatterHelpers'
 import { updateMockContent, trackMockChange } from '../mock-tauri'
@@ -15,7 +15,6 @@ type MarkdownContent = string
 type ToastMessage = string | null
 type VaultPath = string
 type WikilinkText = string
-type ScalarPropertyValue = string | number | boolean | null
 
 const ENTRY_DELETE_MAP: Record<string, Partial<VaultEntry>> = {
   title: { title: '' },
@@ -51,7 +50,7 @@ export type RelationshipPatch = Record<FrontmatterKey, WikilinkText[] | null>
 
 /** Properties patch: a partial update to merge into `entry.properties`.
  *  Keys map to their new scalar values. A `null` value means "remove this key". */
-export type PropertiesPatch = Record<FrontmatterKey, ScalarPropertyValue>
+export type PropertiesPatch = Record<FrontmatterKey, VaultPropertyValue>
 
 export interface EntryPatchResult {
   patch: Partial<VaultEntry>
@@ -98,9 +97,14 @@ function visibleValue(value: FrontmatterValue | undefined): false | null {
   return value === false ? false : null
 }
 
-function scalarPropertyValue(value: FrontmatterValue): ScalarPropertyValue {
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value
-  return String(value)
+function propertyValue(value: FrontmatterValue): VaultPropertyValue | undefined {
+  if (Array.isArray(value)) {
+    return value.some(isWikilink) ? undefined : value.map(String)
+  }
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
+    return value
+  }
+  return undefined
 }
 
 function knownFrontmatterUpdates(value: FrontmatterValue | undefined): Record<FrontmatterKey, Partial<VaultEntry>> {
@@ -153,7 +157,8 @@ function propertiesUpdatePatch({
 }: FrontmatterPatchInput): PropertiesPatch | null {
   const knownUpdates = knownFrontmatterUpdates(value)
   if (systemMetadataKey || Object.hasOwn(knownUpdates, lookupKey) || value == null) return null
-  return singleEntryRecord({ key, value: scalarPropertyValue(value) })
+  const property = propertyValue(value)
+  return property === undefined ? null : singleEntryRecord({ key, value: property })
 }
 
 function updateEntryPatch(input: FrontmatterPatchInput): EntryPatchResult {
@@ -179,7 +184,7 @@ export function frontmatterToEntryPatch(
 export function contentToEntryPatch(content: MarkdownContent): Partial<VaultEntry> {
   const fm = parseFrontmatter(content)
   const merged: Partial<VaultEntry> = {}
-  const customProps: Record<FrontmatterKey, ScalarPropertyValue> = {}
+  const customProps: Record<FrontmatterKey, VaultPropertyValue> = {}
   for (const [key, value] of Object.entries(fm)) {
     const { patch, propertiesPatch } = frontmatterToEntryPatch('update', key, value)
     Object.assign(merged, patch)
@@ -282,8 +287,8 @@ export interface FrontmatterRunRequest {
 
 /** Apply a properties patch by merging into the existing properties map. */
 export function applyPropertiesPatch(
-  existing: Record<FrontmatterKey, ScalarPropertyValue>, propPatch: PropertiesPatch,
-): Record<FrontmatterKey, ScalarPropertyValue> {
+  existing: Record<FrontmatterKey, VaultPropertyValue>, propPatch: PropertiesPatch,
+): Record<FrontmatterKey, VaultPropertyValue> {
   return applyRecordPatch(existing, propPatch)
 }
 

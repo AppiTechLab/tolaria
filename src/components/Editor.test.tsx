@@ -1220,3 +1220,82 @@ describe('person @mention autocomplete', () => {
     expect(items[0].typeColor).toBeTruthy()
   })
 })
+
+describe('hashtag autocomplete', () => {
+  const entries: VaultEntry[] = [
+    {
+      ...mockEntry,
+      title: 'Deep Work',
+      filename: 'deep-work.md',
+      path: '/vault/deep-work.md',
+      properties: {
+        Tags: ['deep-work', 'tag/test'],
+        People: ['Matteo Cellini'],
+      },
+    },
+    {
+      ...mockEntry,
+      title: 'Focus Note',
+      filename: 'focus-note.md',
+      path: '/vault/focus-note.md',
+      properties: {
+        labels: 'focus',
+        Keywords: ['Deep-Work'],
+      },
+    },
+  ]
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock
+  let getHashtagItems: ((query: string) => Promise<any[]>) | null = null
+
+  function renderForHashtags() {
+    mockFilterSuggestionItems.mockClear()
+    mockFilterSuggestionItems.mockImplementation((items: unknown[]) => items)
+    render(
+      <Editor
+        {...defaultProps}
+        tabs={[mockTab]}
+        activeTabPath={mockEntry.path}
+        entries={entries}
+      />
+    )
+    getHashtagItems = capturedGetItemsByTrigger['#'] ?? null
+  }
+
+  it('registers a SuggestionMenuController with # trigger', () => {
+    renderForHashtags()
+    expect(getHashtagItems).toBeTruthy()
+  })
+
+  it('returns tag-like property values and ignores non-tag arrays', async () => {
+    renderForHashtags()
+    const items = await getHashtagItems!('ta')
+    expect(items).toHaveLength(1)
+    expect(items[0].title).toBe('#tag/test')
+  })
+
+  it('supports single-character queries and deduplicates case-insensitively', async () => {
+    renderForHashtags()
+    const items = await getHashtagItems!('d')
+    expect(items.map((item: { title: string }) => item.title)).toEqual(['#deep-work'])
+  })
+
+  it('shows known tags immediately for an empty hashtag query', async () => {
+    renderForHashtags()
+    const items = await getHashtagItems!('')
+    expect(items.map((item: { title: string }) => item.title)).toEqual([
+      '#deep-work',
+      '#focus',
+      '#tag/test',
+    ])
+  })
+
+  it('inserts inline hashtag text when a suggestion is chosen', async () => {
+    renderForHashtags()
+    mockEditor.insertInlineContent.mockClear()
+    const items = await getHashtagItems!('focus')
+    expect(items).toHaveLength(1)
+    items[0].onItemClick()
+    expect(mockEditor.insertInlineContent).toHaveBeenCalledWith('#focus ', { updateSelection: true })
+  })
+})

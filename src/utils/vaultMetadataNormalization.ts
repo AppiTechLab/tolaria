@@ -101,6 +101,14 @@ function normalizeProperties(value: unknown): VaultEntry['properties'] {
   const source = recordFrom(value)
   const result: VaultEntry['properties'] = {}
   for (const [key, rawValue] of Object.entries(source)) {
+    if (Array.isArray(rawValue)) {
+      const items = rawValue.filter((item): item is string => typeof item === 'string')
+      if (items.length === rawValue.length) {
+        Reflect.set(result, key, items)
+      }
+      continue
+    }
+
     if (
       rawValue === null
       || typeof rawValue === 'string'

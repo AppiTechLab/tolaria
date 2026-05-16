@@ -27,13 +27,15 @@ import { useImageLightbox } from '../hooks/useImageLightbox'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { isTauri } from '../mock-tauri'
 import { buildTypeEntryMap } from '../utils/typeColors'
+import { detectPropertyType } from '../utils/propertyTypes'
 import { preFilterWikilinks, deduplicateByPath, MIN_QUERY_LENGTH } from '../utils/wikilinkSuggestions'
 import { filterPersonMentions, PERSON_MENTION_MIN_QUERY } from '../utils/personMentionSuggestions'
 import { attachClickHandlers, enrichSuggestionItems, hasMultipleSuggestionWorkspaces } from '../utils/suggestionEnrichment'
+import { bestSearchRank } from '../utils/fuzzyMatch'
 import { observeNativeTextAssistanceDisabled } from '../lib/nativeTextAssistance'
 import { getRuntimeStyleNonce } from '../lib/runtimeStyleNonce'
 import { WikilinkSuggestionMenu, type WikilinkSuggestionItem } from './WikilinkSuggestionMenu'
-import type { VaultEntry } from '../types'
+import type { VaultEntry, VaultPropertyValue } from '../types'
 import { _wikilinkEntriesRef } from './editorSchema'
 import {
   handleEditorFileBlockClick,
@@ -109,6 +111,9 @@ type BlockNoteRenderRecoveryState = {
   recoveryKey: number
   retries: number
 }
+
+const HASHTAG_MIN_QUERY = 0
+const HASHTAG_MAX_RESULTS = 20
 
 class BlockNoteRenderRecoveryBoundary extends Component<{
   children: (recoveryKey: number) => ReactNode
@@ -1050,6 +1055,85 @@ function safeStringArray(value: unknown): string[] {
     : []
 }
 
+function tagSuggestionValues(value: VaultPropertyValue): string[] {
+  if (Array.isArray(value)) return value.map(item => item.trim()).filter(Boolean)
+  const scalar = nonEmptyString(value)
+  return scalar ? [scalar] : []
+}
+
+type HashtagSuggestionBaseItem = {
+  title: string
+  aliases: string[]
+  group: string
+  entryTitle: string
+  path: string
+  tag: string
+}
+
+function buildBaseHashtagItems(entries: VaultEntry[]): HashtagSuggestionBaseItem[] {
+  const seen = new Set<string>()
+  const items: HashtagSuggestionBaseItem[] = []
+
+  for (const entry of entries) {
+    for (const [key, rawValue] of Object.entries(entry.properties ?? {})) {
+      const value = rawValue as VaultPropertyValue
+      if (detectPropertyType(key, value) !== 'tags') continue
+
+      for (const tag of tagSuggestionValues(value)) {
+        const dedupeKey = tag.toLowerCase()
+        if (seen.has(dedupeKey)) continue
+        seen.add(dedupeKey)
+        items.push({
+          title: `#${tag}`,
+          aliases: [tag],
+          group: 'Tag',
+          entryTitle: tag,
+          path: `tag:${dedupeKey}`,
+          tag,
+        })
+      }
+    }
+  }
+
+  return items
+}
+
+function filterHashtagSuggestions<T extends HashtagSuggestionBaseItem>(
+  items: T[],
+  query: string,
+): T[] {
+  if (query.trim().length === 0) return items
+  const lowerQuery = query.toLowerCase()
+  return items.filter(item =>
+    item.title.toLowerCase().includes(lowerQuery)
+    || item.aliases.some(alias => alias.toLowerCase().includes(lowerQuery))
+    || item.entryTitle.toLowerCase().includes(lowerQuery),
+  )
+}
+
+function buildHashtagSuggestionItems(options: {
+  items: HashtagSuggestionBaseItem[]
+  query: string
+  insertHashtag: (tag: string) => void
+  runEditorAction: (action: SuggestionAction) => void
+}): WikilinkSuggestionItem[] {
+  const { items, query, insertHashtag, runEditorAction } = options
+  const sortedItems = [...items].sort((left, right) => {
+    const rankDelta = bestSearchRank(query, left.entryTitle, left.aliases)
+      - bestSearchRank(query, right.entryTitle, right.aliases)
+    if (rankDelta !== 0) return rankDelta
+    return left.entryTitle.localeCompare(right.entryTitle)
+  })
+
+  return guardSuggestionMenuItems(
+    sortedItems.slice(0, HASHTAG_MAX_RESULTS).map(item => ({
+      ...item,
+      onItemClick: () => insertHashtag(item.tag),
+    })),
+    runEditorAction,
+  )
+}
+
 function buildBaseSuggestionItems(entries: VaultEntry[]) {
   return deduplicateByPath(entries.flatMap(entry => {
     const path = nonEmptyString(entry.path)
@@ -1086,9 +1170,23 @@ function useInsertWikilink(
   }, [editor, runEditorAction])
 }
 
+function useInsertHashtag(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  runEditorAction: (action: SuggestionAction) => void,
+) {
+  return useCallback((tag: string) => {
+    runEditorAction(() => {
+      editor.insertInlineContent(`#${tag} `, { updateSelection: true })
+      trackEvent('hashtag_inserted')
+    })
+  }, [editor, runEditorAction])
+}
+
 function useSuggestionMenuItems(options: {
   baseItems: ReturnType<typeof buildBaseSuggestionItems>
+  baseHashtagItems: ReturnType<typeof buildBaseHashtagItems>
   editor: ReturnType<typeof useCreateBlockNote>
+  insertHashtag: (tag: string) => void
   insertWikilink: (target: string) => void
   locale: AppLocale
   runEditorAction: (action: SuggestionAction) => void
@@ -1098,7 +1196,9 @@ function useSuggestionMenuItems(options: {
 }) {
   const {
     baseItems,
+    baseHashtagItems,
     editor,
+    insertHashtag,
     insertWikilink,
     locale,
     runEditorAction,
@@ -1108,14 +1208,29 @@ function useSuggestionMenuItems(options: {
   } = options
   const t = useMemo(() => createTranslator(locale), [locale])
 
-  const buildItems = useCallback((query: string, triggerCharacter: '[[' | '@') => {
+  const buildItems = useCallback((query: string, triggerCharacter: '[[' | '@' | '#') => {
     const normalizedQuery = normalizeSuggestionQuery(query, triggerCharacter)
-    const minLength = triggerCharacter === '[[' ? MIN_QUERY_LENGTH : PERSON_MENTION_MIN_QUERY
+    const minLength = triggerCharacter === '[['
+      ? MIN_QUERY_LENGTH
+      : triggerCharacter === '@'
+        ? PERSON_MENTION_MIN_QUERY
+        : HASHTAG_MIN_QUERY
     if (normalizedQuery.length < minLength) return null
 
     const candidates = triggerCharacter === '[['
       ? preFilterWikilinks(baseItems, normalizedQuery)
-      : filterPersonMentions(baseItems, normalizedQuery)
+      : triggerCharacter === '@'
+        ? filterPersonMentions(baseItems, normalizedQuery)
+        : filterHashtagSuggestions(baseHashtagItems, normalizedQuery)
+
+    if (triggerCharacter === '#') {
+      return buildHashtagSuggestionItems({
+        items: candidates,
+        query: normalizedQuery,
+        insertHashtag,
+        runEditorAction,
+      })
+    }
 
     const items = attachClickHandlers(candidates, insertWikilink, vaultPath ?? '', sourceEntry)
     return guardSuggestionMenuItems(
@@ -1124,7 +1239,7 @@ function useSuggestionMenuItems(options: {
       }),
       runEditorAction,
     )
-  }, [baseItems, insertWikilink, runEditorAction, sourceEntry, typeEntryMap, vaultPath])
+  }, [baseHashtagItems, baseItems, insertHashtag, insertWikilink, runEditorAction, sourceEntry, typeEntryMap, vaultPath])
 
   const getWikilinkItems = useCallback(async (query: string): Promise<WikilinkSuggestionItem[]> => (
     buildItems(query, '[[') ?? []
@@ -1132,6 +1247,10 @@ function useSuggestionMenuItems(options: {
 
   const getPersonMentionItems = useCallback(async (query: string): Promise<WikilinkSuggestionItem[]> => (
     buildItems(query, '@') ?? []
+  ), [buildItems])
+
+  const getHashtagItems = useCallback(async (query: string): Promise<WikilinkSuggestionItem[]> => (
+    buildItems(query, '#') ?? []
   ), [buildItems])
 
   const getSlashMenuItems = useCallback(async (query: string) => {
@@ -1149,6 +1268,7 @@ function useSuggestionMenuItems(options: {
   }, [editor, runEditorAction, t])
 
   return {
+    getHashtagItems,
     getWikilinkItems,
     getPersonMentionItems,
     getSlashMenuItems,
@@ -1161,6 +1281,7 @@ type EditorInteractionControllersProps = ReturnType<typeof useSuggestionMenuItem
 }
 
 function EditorInteractionControllers({
+  getHashtagItems,
   getPersonMentionItems,
   getSlashMenuItems,
   getWikilinkItems,
@@ -1203,6 +1324,12 @@ function EditorInteractionControllers({
       <SuggestionMenuController
         triggerCharacter="@"
         getItems={getPersonMentionItems}
+        suggestionMenuComponent={WikilinkSuggestionMenu}
+        onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
+      />
+      <SuggestionMenuController
+        triggerCharacter="#"
+        getItems={getHashtagItems}
         suggestionMenuComponent={WikilinkSuggestionMenu}
         onItemClick={(item: WikilinkSuggestionItem) => runEditorAction(item.onItemClick)}
       />
@@ -1319,6 +1446,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
 
   const typeEntryMap = useMemo(() => buildTypeEntryMap(entries), [entries])
   const baseItems = useMemo(() => buildBaseSuggestionItems(entries), [entries])
+  const baseHashtagItems = useMemo(() => buildBaseHashtagItems(entries), [entries])
   const runEditorAction = useCallback((action: SuggestionAction) => {
     runSuggestionActionSafely({
       action,
@@ -1345,10 +1473,13 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
     activatePlainTextPaste()
     handleWhitespaceMouseSelection(event)
   }, [activatePlainTextPaste, handleWhitespaceMouseSelection])
+  const insertHashtag = useInsertHashtag(editor, runEditorAction)
   const insertWikilink = useInsertWikilink(editor, runEditorAction)
   const suggestionMenuItems = useSuggestionMenuItems({
+    baseHashtagItems,
     baseItems,
     editor,
+    insertHashtag,
     insertWikilink,
     locale,
     runEditorAction,

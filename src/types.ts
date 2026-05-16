@@ -5,6 +5,8 @@ import type { ThemeMode } from './lib/themeMode'
 import type { AppLocale } from './lib/i18n'
 import type { DateDisplayFormat } from './utils/dateDisplay'
 
+export type VaultPropertyValue = string | number | boolean | string[] | null
+
 export interface VaultEntry {
   path: string
   filename: string
@@ -53,8 +55,8 @@ export interface VaultEntry {
   listPropertiesDisplay: string[]
   /** All wikilink targets found in the note content. Extracted from [[target]] patterns. */
   outgoingLinks: string[]
-  /** Custom scalar frontmatter properties (non-relationship, non-structural). */
-  properties: Record<string, string | number | boolean | null>
+  /** Custom frontmatter properties (non-relationship, non-structural). */
+  properties: Record<string, VaultPropertyValue>
   /** Whether the note body has an H1 heading on the first non-empty line. */
   hasH1: boolean
   /** File kind: "markdown", "text", or "binary". Determines editor behavior.

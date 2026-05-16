@@ -51,6 +51,13 @@ describe('frontmatterToEntryPatch', () => {
     expect(result.relationshipPatch).toBeNull()
   })
 
+  it('preserves custom string arrays in propertiesPatch', () => {
+    const result = frontmatterToEntryPatch('update', 'Tags', ['alpha', 'beta'])
+    expect(result.patch).toEqual({})
+    expect(result.propertiesPatch).toEqual({ Tags: ['alpha', 'beta'] })
+    expect(result.relationshipPatch).toBeNull()
+  })
+
   it('produces relationship patch for wikilink values on unknown keys', () => {
     const result = frontmatterToEntryPatch('update', 'Notes', ['[[note-a]]', '[[note-b|Note B]]'])
     expect(result.patch).toEqual({})
@@ -166,6 +173,11 @@ describe('contentToEntryPatch', () => {
   it('includes custom frontmatter keys in properties patch', () => {
     const content = '---\ntype: Note\ncustom: value\n---\n'
     expect(contentToEntryPatch(content)).toEqual({ isA: 'Note', properties: { custom: 'value' } })
+  })
+
+  it('preserves custom frontmatter arrays in properties patch', () => {
+    const content = '---\ntype: Note\nTags:\n  - alpha\n---\n'
+    expect(contentToEntryPatch(content)).toEqual({ isA: 'Note', properties: { Tags: ['alpha'] } })
   })
 
   it('extracts note width without leaking it into properties', () => {

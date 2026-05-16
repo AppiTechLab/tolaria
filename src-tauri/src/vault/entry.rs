@@ -73,8 +73,8 @@ pub struct VaultEntry {
     /// Extracted from `[[target]]` and `[[target|display]]` patterns.
     #[serde(rename = "outgoingLinks", default)]
     pub outgoing_links: Vec<String>,
-    /// Custom scalar frontmatter properties (non-relationship, non-structural).
-    /// Only includes strings, numbers, and booleans — arrays/objects are excluded.
+    /// Custom frontmatter properties (non-relationship, non-structural).
+    /// Includes strings, numbers, booleans, nulls, and non-wikilink string arrays.
     #[serde(default)]
     pub properties: HashMap<String, serde_json::Value>,
     /// Properties to display as chips in the note list for this Type's notes.

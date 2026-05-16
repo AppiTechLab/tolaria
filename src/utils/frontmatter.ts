@@ -26,10 +26,6 @@ function unquote(s: FrontmatterText): FrontmatterText {
   return s.replace(/^["']|["']$/g, '')
 }
 
-function collapseList(items: FrontmatterText[]): FrontmatterValue {
-  return items.length === 1 ? items[0] : items
-}
-
 function isBlockScalar(value: FrontmatterText): boolean {
   return value === '|' || value === '>'
 }
@@ -39,8 +35,9 @@ function isInlineArrayLiteral(value: FrontmatterText): boolean {
 }
 
 function parseInlineArray(value: FrontmatterText): FrontmatterValue {
-  const items = value.slice(1, -1).split(',').map(s => unquote(s.trim()))
-  return collapseList(items)
+  const inner = value.slice(1, -1).trim()
+  if (inner === '') return []
+  return inner.split(',').map(s => unquote(s.trim()))
 }
 
 function parseScalar(value: FrontmatterText): FrontmatterValue {
@@ -151,7 +148,7 @@ function flushList(
   currentList: FrontmatterText[],
 ): FrontmatterText[] {
   if (currentKey && currentList.length > 0) {
-    assignFrontmatterValue(result, collisionKeys, currentKey, collapseList(currentList))
+    assignFrontmatterValue(result, collisionKeys, currentKey, currentList)
   }
   return []
 }
