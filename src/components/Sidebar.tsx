@@ -69,6 +69,8 @@ interface SidebarProps {
   pluralizeTypeLabels?: boolean
   locale?: AppLocale
   onCollapse?: () => void
+  onToggleNoteList?: () => void
+  noteListCollapsed?: boolean
   onGoBack?: () => void
   onGoForward?: () => void
   canGoBack?: boolean
@@ -643,6 +645,8 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
       <SidebarTitleBar
         locale={locale}
         onCollapse={props.onCollapse}
+        onToggleNoteList={props.onToggleNoteList}
+        noteListCollapsed={props.noteListCollapsed}
         onGoBack={props.onGoBack}
         onGoForward={props.onGoForward}
         canGoBack={props.canGoBack}

@@ -9,7 +9,7 @@ type NoteListInnerProps = NoteListProps & {
   multiSelectionCommandRef?: React.MutableRefObject<NoteListMultiSelectionCommands | null>
 }
 
-function NoteListInner({ onBulkOrganize, multiSelectionCommandRef, ...props }: NoteListInnerProps) {
+function NoteListInner({ onBulkOrganize, multiSelectionCommandRef, onCollapseNoteList, ...props }: NoteListInnerProps) {
   const model = useNoteListModel(props)
 
   const handleBulkOrganize = useCallback(() => {
@@ -47,7 +47,7 @@ function NoteListInner({ onBulkOrganize, multiSelectionCommandRef, ...props }: N
     props.onBulkDeletePermanently,
   ])
 
-  return <NoteListLayout {...model} handleBulkOrganize={onBulkOrganize ? handleBulkOrganize : undefined} />
+  return <NoteListLayout {...model} handleBulkOrganize={onBulkOrganize ? handleBulkOrganize : undefined} onCollapseNoteList={onCollapseNoteList} />
 }
 
 export const NoteList = memo(NoteListInner)

@@ -58,7 +58,7 @@ export function migrateLocalStorageToVaultConfig(loaded: VaultConfig | null): Va
   if (result.view_mode === null) {
     try {
       const raw = getAppStorageItem('viewMode')
-      if (raw === 'editor-only' || raw === 'editor-list' || raw === 'all') {
+      if (raw === 'editor-only' || raw === 'editor-list' || raw === 'editor-sidebar' || raw === 'all') {
         result.view_mode = raw
       }
     } catch { /* ignore */ }

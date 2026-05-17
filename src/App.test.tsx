@@ -1535,6 +1535,28 @@ describe('App', () => {
     })
   })
 
+  it('toggles the note list while keeping the sidebar visible', async () => {
+    render(<App />)
+    await waitFor(() => {
+      expect(screen.getByText('All Notes')).toBeInTheDocument()
+    })
+
+    expect(document.querySelector('.app__sidebar')).toBeInTheDocument()
+    expect(document.querySelector('.app__note-list')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide note list' }))
+    await waitFor(() => {
+      expect(document.querySelector('.app__sidebar')).toBeInTheDocument()
+      expect(document.querySelector('.app__note-list')).not.toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show note list' }))
+    await waitFor(() => {
+      expect(document.querySelector('.app__sidebar')).toBeInTheDocument()
+      expect(document.querySelector('.app__note-list')).toBeInTheDocument()
+    })
+  })
+
   it('updates the main-window size constraints when the view mode changes', async () => {
     const { invoke } = await import('@tauri-apps/api/core') as { invoke: ReturnType<typeof vi.fn> }
 

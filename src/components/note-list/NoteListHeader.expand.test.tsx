@@ -58,4 +58,15 @@ describe('NoteListHeader expand sidebar button', () => {
       window.removeEventListener(APP_COMMAND_EVENT_NAME, commandListener)
     }
   })
+
+  it('shows a hide-note-list button in editor-list mode and calls the callback', () => {
+    const onCollapseNoteList = vi.fn()
+
+    renderHeader({ sidebarCollapsed: true, onCollapseNoteList })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide note list' }))
+
+    expect(onCollapseNoteList).toHaveBeenCalledTimes(1)
+    expect(trackEvent).toHaveBeenCalledWith('note_list_collapsed_from_note_list_header')
+  })
 })

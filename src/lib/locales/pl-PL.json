@@ -389,6 +389,8 @@
   "noteList.searchPlaceholder": "Szukaj notatek...",
   "noteList.searchAction": "Szukaj notatek",
   "noteList.createNote": "Utwórz nową notatkę",
+  "noteList.action.hidePanel": "Hide note list",
+  "noteList.action.showPanel": "Show note list",
   "noteList.empty.changesError": "Nie udało się załadować zmian: {error}",
   "noteList.empty.noChanges": "Brak oczekujących zmian",
   "noteList.empty.noArchived": "Brak zarchiwizowanych notatek",

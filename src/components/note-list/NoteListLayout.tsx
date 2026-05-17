@@ -6,6 +6,7 @@ import type { useNoteListModel } from './useNoteListModel'
 
 type NoteListLayoutProps = ReturnType<typeof useNoteListModel> & {
   handleBulkOrganize?: () => void
+  onCollapseNoteList?: () => void
 }
 
 const NOTE_LIST_LOADING_ROWS = [
@@ -272,6 +273,7 @@ function NoteListLayoutHeader({
   toggleSearch,
   setSearch,
   handleSearchKeyDown,
+  onCollapseNoteList,
 }: Pick<
   NoteListLayoutProps,
   | 'title'
@@ -297,6 +299,7 @@ function NoteListLayoutHeader({
   | 'toggleSearch'
   | 'setSearch'
   | 'handleSearchKeyDown'
+  | 'onCollapseNoteList'
 >) {
   return (
     <NoteListHeader
@@ -323,6 +326,7 @@ function NoteListLayoutHeader({
       onToggleSearch={toggleSearch}
       onSearchChange={setSearch}
       onSearchKeyDown={handleSearchKeyDown}
+      onCollapseNoteList={onCollapseNoteList}
     />
   )
 }

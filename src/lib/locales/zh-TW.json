@@ -389,6 +389,8 @@
   "noteList.searchPlaceholder": "搜尋筆記...",
   "noteList.searchAction": "搜尋筆記",
   "noteList.createNote": "新建筆記",
+  "noteList.action.hidePanel": "Hide note list",
+  "noteList.action.showPanel": "Show note list",
   "noteList.empty.changesError": "載入更改失敗：{error}",
   "noteList.empty.noChanges": "沒有待處理更改",
   "noteList.empty.noArchived": "沒有歸檔筆記",

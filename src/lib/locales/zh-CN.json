@@ -389,6 +389,8 @@
   "noteList.searchPlaceholder": "搜索笔记...",
   "noteList.searchAction": "搜索笔记",
   "noteList.createNote": "新建笔记",
+  "noteList.action.hidePanel": "Hide note list",
+  "noteList.action.showPanel": "Show note list",
   "noteList.empty.changesError": "加载更改失败：{error}",
   "noteList.empty.noChanges": "没有待处理更改",
   "noteList.empty.noArchived": "没有归档笔记",

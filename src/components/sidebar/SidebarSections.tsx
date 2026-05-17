@@ -372,6 +372,8 @@ function SidebarTitleBarAction({
 export function SidebarTitleBar({
   locale = 'en',
   onCollapse,
+  onToggleNoteList,
+  noteListCollapsed = false,
   onGoBack,
   onGoForward,
   canGoBack = false,
@@ -379,6 +381,8 @@ export function SidebarTitleBar({
 }: {
   locale?: AppLocale
   onCollapse?: () => void
+  onToggleNoteList?: () => void
+  noteListCollapsed?: boolean
   onGoBack?: () => void
   onGoForward?: () => void
   canGoBack?: boolean
@@ -386,6 +390,7 @@ export function SidebarTitleBar({
 }) {
   const { onMouseDown } = useDragRegion()
   const collapseLabel = translate(locale, 'sidebar.action.collapse')
+  const noteListLabel = translate(locale, noteListCollapsed ? 'noteList.action.showPanel' : 'noteList.action.hidePanel')
   const backLabel = translate(locale, 'command.navigation.goBack')
   const forwardLabel = translate(locale, 'command.navigation.goForward')
 
@@ -399,6 +404,11 @@ export function SidebarTitleBar({
         {onCollapse && (
           <SidebarTitleBarAction label={collapseLabel} shortcut={SIDEBAR_COLLAPSE_SHORTCUT} onClick={onCollapse}>
             <SidebarSimple size={16} weight="regular" />
+          </SidebarTitleBarAction>
+        )}
+        {onToggleNoteList && (
+          <SidebarTitleBarAction label={noteListLabel} onClick={onToggleNoteList}>
+            <SidebarSimple size={16} weight="regular" style={{ transform: 'scaleX(-1)' }} />
           </SidebarTitleBarAction>
         )}
         {onGoBack && (

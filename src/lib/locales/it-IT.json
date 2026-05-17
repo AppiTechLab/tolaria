@@ -389,6 +389,8 @@
   "noteList.searchPlaceholder": "Cerca note...",
   "noteList.searchAction": "Cerca note",
   "noteList.createNote": "Crea nuova nota",
+  "noteList.action.hidePanel": "Hide note list",
+  "noteList.action.showPanel": "Show note list",
   "noteList.empty.changesError": "Caricamento delle modifiche non riuscito: {error}",
   "noteList.empty.noChanges": "Nessuna modifica in sospeso",
   "noteList.empty.noArchived": "Nessuna nota archiviata",

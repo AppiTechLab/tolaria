@@ -51,6 +51,7 @@ interface NoteListHeaderProps {
   onSearchChange: (value: string) => void
   onSearchKeyDown: (event: React.KeyboardEvent<HTMLInputElement>) => void
   onGitRepositoryChange?: (path: string) => void
+  onCollapseNoteList?: () => void
 }
 
 function dispatchExpandSidebarFromHeader() {
@@ -75,6 +76,34 @@ function ExpandSidebarButton({ locale }: { locale: AppLocale }) {
       data-no-drag
     >
       <SidebarSimple size={16} weight="regular" />
+    </Button>
+  )
+}
+
+function CollapseNoteListButton({
+  locale,
+  onCollapseNoteList,
+}: {
+  locale: AppLocale
+  onCollapseNoteList: () => void
+}) {
+  const collapseNoteListLabel = translate(locale, 'noteList.action.hidePanel')
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-xs"
+      className={NOTE_LIST_ACTION_BUTTON_CLASSNAME}
+      onClick={() => {
+        trackEvent('note_list_collapsed_from_note_list_header')
+        onCollapseNoteList()
+      }}
+      title={collapseNoteListLabel}
+      aria-label={collapseNoteListLabel}
+      data-no-drag
+    >
+      <SidebarSimple size={16} weight="regular" style={{ transform: 'scaleX(-1)' }} />
     </Button>
   )
 }
@@ -154,6 +183,8 @@ function HeaderActions({
   onSortChange,
   onCreateNote,
   onToggleSearch,
+  sidebarCollapsed,
+  onCollapseNoteList,
 }: Pick<
   NoteListHeaderProps,
   | 'isEntityView'
@@ -165,11 +196,14 @@ function HeaderActions({
   | 'onSortChange'
   | 'onCreateNote'
   | 'onToggleSearch'
+  | 'sidebarCollapsed'
+  | 'onCollapseNoteList'
 > & {
   locale: AppLocale
 }) {
   return (
     <div className="ml-3 flex shrink-0 items-center justify-end gap-2" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+      {sidebarCollapsed && onCollapseNoteList && <CollapseNoteListButton locale={locale} onCollapseNoteList={onCollapseNoteList} />}
       {!isEntityView && <SortDropdown groupLabel="__list__" current={listSort} direction={listDirection} customProperties={customProperties} locale={locale} onChange={onSortChange} />}
       <Button type="button" variant="ghost" size="icon-xs" className={NOTE_LIST_ACTION_BUTTON_CLASSNAME} onClick={onToggleSearch} title={translate(locale, 'noteList.searchAction')} aria-label={translate(locale, 'noteList.searchAction')}>
         <MagnifyingGlass size={16} />
@@ -259,6 +293,7 @@ export function NoteListHeader({
   onSearchChange,
   onSearchKeyDown,
   onGitRepositoryChange,
+  onCollapseNoteList,
 }: NoteListHeaderProps) {
   const { onMouseDown: onDragMouseDown } = useDragRegion()
 
@@ -282,6 +317,8 @@ export function NoteListHeader({
           onSortChange={onSortChange}
           onCreateNote={onCreateNote}
           onToggleSearch={onToggleSearch}
+          sidebarCollapsed={sidebarCollapsed}
+          onCollapseNoteList={onCollapseNoteList}
         />
       </div>
       <RepositorySelectorRow

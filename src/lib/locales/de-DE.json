@@ -389,6 +389,8 @@
   "noteList.searchPlaceholder": "Notizen durchsuchen …",
   "noteList.searchAction": "Notizen durchsuchen",
   "noteList.createNote": "Neue Notiz erstellen",
+  "noteList.action.hidePanel": "Hide note list",
+  "noteList.action.showPanel": "Show note list",
   "noteList.empty.changesError": "Änderungen konnten nicht geladen werden: {error}",
   "noteList.empty.noChanges": "Keine ausstehenden Änderungen",
   "noteList.empty.noArchived": "Keine archivierten Notizen",

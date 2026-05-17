@@ -480,6 +480,7 @@ export interface NoteListProps {
   onGitRepositoryChange?: (path: string) => void
   getNoteStatus?: (path: string) => NoteStatus
   sidebarCollapsed?: boolean
+  onCollapseNoteList?: () => void
   onSelectNote: (entry: VaultEntry) => void
   onReplaceActiveTab: (entry: VaultEntry) => void
   onEnterNeighborhood?: (entry: VaultEntry) => void
