@@ -39,9 +39,9 @@ describe('resolveHeaderTitle', () => {
     expect(resolveHeaderTitle(selection, null)).toBe('History')
   })
 
-  it('localizes built-in note list titles', () => {
+  it('keeps built-in note list titles in English', () => {
     const selection: SidebarSelection = { kind: 'filter', filter: 'archived' }
-    expect(resolveHeaderTitle(selection, null, [], 'zh-CN')).toBe('归档')
+    expect(resolveHeaderTitle(selection, null, [], 'zh-CN')).toBe('Archive')
   })
 
   it('keeps user-authored view names unchanged', () => {

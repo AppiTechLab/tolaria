@@ -89,17 +89,17 @@ describe('UpdateBanner', () => {
     expect(screen.getByTestId('update-dismiss')).toBeTruthy()
   })
 
-  it('localizes available update copy', () => {
+  it('keeps available update copy in English when a non-English locale is requested', () => {
     renderBanner(makeAvailableStatus({
       version: '2026.4.16-alpha.3',
       displayVersion: 'Alpha 2026.4.16.3',
     }), makeActions(), 'zh-CN')
 
     expect(screen.getByText(/Tolaria Alpha 2026\.4\.16\.3/)).toBeTruthy()
-    expect(screen.getByText(/可用/)).toBeTruthy()
-    expect(screen.getByTestId('update-release-notes')).toHaveTextContent('发行说明')
-    expect(screen.getByTestId('update-now-btn')).toHaveTextContent('立即更新')
-    expect(screen.getByTestId('update-dismiss')).toHaveAttribute('aria-label', '关闭')
+    expect(screen.getByText(/is available/)).toBeTruthy()
+    expect(screen.getByTestId('update-release-notes')).toHaveTextContent('Release Notes')
+    expect(screen.getByTestId('update-now-btn')).toHaveTextContent('Update Now')
+    expect(screen.getByTestId('update-dismiss')).toHaveAttribute('aria-label', 'Dismiss')
   })
 
   it('"Update Now" calls startDownload', () => {

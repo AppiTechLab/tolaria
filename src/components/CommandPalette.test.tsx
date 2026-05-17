@@ -243,13 +243,13 @@ describe('CommandPalette', () => {
     expect(screen.getByText('No matching commands')).toBeInTheDocument()
   })
 
-  it('localizes command palette chrome', () => {
+  it('keeps command palette chrome in English even when a non-English locale is requested', () => {
     render(<CommandPalette open={true} commands={commands} locale="zh-CN" onClose={onClose} />)
-    const input = screen.getByPlaceholderText('输入命令...')
+    const input = screen.getByPlaceholderText('Type a command...')
     fireEvent.change(input, { target: { value: 'zzzzzzz' } })
 
-    expect(screen.getByText('没有匹配的命令')).toBeInTheDocument()
-    expect(screen.getByText('↑↓ 导航')).toBeInTheDocument()
+    expect(screen.getByText('No matching commands')).toBeInTheDocument()
+    expect(screen.getByText('↑↓ navigate')).toBeInTheDocument()
   })
 
   it('calls onClose when pressing Escape', () => {

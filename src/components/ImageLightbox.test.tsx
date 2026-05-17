@@ -16,7 +16,7 @@ describe('ImageLightbox', () => {
     expect(screen.getByText('Image preview')).toHaveClass('sr-only')
   })
 
-  it('falls back to localized alt text when the image has no alt', () => {
+  it('falls back to English alt text when the image has no alt', () => {
     render(
       <ImageLightbox
         image={{ src: 'https://example.com/photo.png', alt: '' }}
@@ -25,7 +25,7 @@ describe('ImageLightbox', () => {
       />,
     )
 
-    expect(screen.getByRole('img', { name: '图像预览' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'Image preview' })).toBeInTheDocument()
   })
 
   it('calls onClose when the dialog closes', () => {
