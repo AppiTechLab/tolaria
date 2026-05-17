@@ -154,29 +154,52 @@ function normalizeTagItems(value: unknown): string[] {
   return normalized ? [normalized] : []
 }
 
-function readNoteTags(content: string): string[] {
+function readFrontmatterTags(content: string): string[] {
   const frontmatter = parseFrontmatter(content)
   const frontmatterTagKey = Object.keys(frontmatter).find((key) => key.trim().toLowerCase() === 'tags')
-  const merged = new Set(normalizeTagItems(frontmatterTagKey ? frontmatter[frontmatterTagKey] : undefined))
+  return normalizeTagItems(frontmatterTagKey ? frontmatter[frontmatterTagKey] : undefined)
+}
 
-  for (const tag of extractInlineTags(content)) {
-    const normalized = normalizeTag(tag)
-    if (normalized) merged.add(normalized)
+function readNoteInlineTags(content: string): string[] {
+  const [, body] = splitFrontmatter(content)
+  const merged = new Set<string>()
+  let inCodeBlock = false
+
+  for (const line of body.split(/\r?\n/u)) {
+    if (isFenceDelimiter(line)) {
+      inCodeBlock = !inCodeBlock
+      continue
+    }
+    if (inCodeBlock || TASK_LINE_RE.test(line)) continue
+
+    for (const tag of extractInlineTags(line)) {
+      const normalized = normalizeTag(tag)
+      if (normalized) merged.add(normalized)
+    }
   }
 
   return [...merged]
+}
+
+function mergeTags(...tagCollections: string[][]): string[] {
+  return [...new Set(tagCollections.flat().filter(Boolean))]
+}
+
+function readNoteTags(content: string): string[] {
+  return mergeTags(readFrontmatterTags(content), readNoteInlineTags(content))
 }
 
 function isFenceDelimiter(line: string): boolean {
   return FENCE_DELIMITER_RE.test(line)
 }
 
-function buildTask(path: string, lineNumber: number, lineText: string, tags: string[]): MarkdownTask | null {
+function buildTask(path: string, lineNumber: number, lineText: string, noteTags: string[]): MarkdownTask | null {
   const match = TASK_LINE_RE.exec(lineText)
   if (!match) return null
 
   const status = match[2] ?? ' '
   const rawText = match[3] ?? ''
+  const taskTags = mergeTags(noteTags, extractInlineTags(lineText).map(normalizeTag).filter(Boolean))
   const { priority, prioritySymbol } = readTaskPriority(rawText)
   const { dueDate, scheduledDate, doneDate } = readTaskDates(rawText)
 
@@ -190,7 +213,7 @@ function buildTask(path: string, lineNumber: number, lineText: string, tags: str
     prioritySymbol,
     description: stripTaskMetadata(rawText),
     rawText,
-    tags,
+    tags: taskTags,
     dueDate,
     scheduledDate,
     doneDate,

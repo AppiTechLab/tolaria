@@ -106,18 +106,18 @@ describe('taskQuery', () => {
     ])
   })
 
-  it('filters tasks by merged note tags', () => {
+  it('filters tasks by note tags without leaking task tags to siblings', () => {
     const result = executeTaskQuery({
       queryText: [
         'not done',
-        'Tags include #PM/filiere/spring2026',
+        'tags include #PM/project/Auto-Anno',
         'sort by path',
       ].join('\n'),
       contentByPath: {
         '/vault/project/alpha.md': [
           '---',
           'Tags:',
-          '  - PM/filiere/spring2026',
+          '  - PM/project/Auto-Anno',
           '---',
           '# Alpha',
           '',
@@ -126,19 +126,20 @@ describe('taskQuery', () => {
         '/vault/project/beta.md': [
           '# Beta',
           '',
-          '- [ ] Inline tag task #PM/filiere/spring2026',
+          '- [ ] Inline tag task #PM/project/Auto-Anno',
+          '- [ ] Untagged sibling task',
         ].join('\n'),
         '/vault/project/gamma.md': [
           '# Gamma',
           '',
-          '- [ ] Different tag task #PM/filiere/fall2026',
+          '- [ ] Different tag task #PM/project/Elsewhere',
         ].join('\n'),
       },
     })
 
     expect(result.tasks.map((task) => `${task.path}:${task.description}`)).toEqual([
       '/vault/project/alpha.md:Frontmatter task',
-      '/vault/project/beta.md:Inline tag task #PM/filiere/spring2026',
+      '/vault/project/beta.md:Inline tag task #PM/project/Auto-Anno',
     ])
   })
 
