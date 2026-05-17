@@ -1,5 +1,6 @@
 import type { SidebarSelection } from '../types'
 
+export const LAB_HOME_SELECTION: SidebarSelection = { kind: 'filter', filter: 'labHome' }
 export const INBOX_SELECTION: SidebarSelection = { kind: 'filter', filter: 'inbox' }
 export const ALL_NOTES_SELECTION: SidebarSelection = { kind: 'filter', filter: 'all' }
 
@@ -8,7 +9,7 @@ export function isExplicitOrganizationEnabled(explicitOrganization?: boolean | n
 }
 
 export function getDefaultSelectionForOrganization(explicitOrganization?: boolean | null): SidebarSelection {
-  return isExplicitOrganizationEnabled(explicitOrganization) ? INBOX_SELECTION : ALL_NOTES_SELECTION
+  return isExplicitOrganizationEnabled(explicitOrganization) ? LAB_HOME_SELECTION : ALL_NOTES_SELECTION
 }
 
 export function sanitizeSelectionForOrganization(

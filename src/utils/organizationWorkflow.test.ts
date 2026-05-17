@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ALL_NOTES_SELECTION,
   INBOX_SELECTION,
+  LAB_HOME_SELECTION,
   getDefaultSelectionForOrganization,
   isExplicitOrganizationEnabled,
   sanitizeSelectionForOrganization,
@@ -17,8 +18,8 @@ describe('organizationWorkflow', () => {
     expect(isExplicitOrganizationEnabled(false)).toBe(false)
   })
 
-  it('defaults to Inbox when explicit organization is enabled', () => {
-    expect(getDefaultSelectionForOrganization(true)).toEqual(INBOX_SELECTION)
+  it('defaults to Lab Home when explicit organization is enabled', () => {
+    expect(getDefaultSelectionForOrganization(true)).toEqual(LAB_HOME_SELECTION)
   })
 
   it('defaults to All Notes when explicit organization is disabled', () => {

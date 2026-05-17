@@ -974,31 +974,32 @@ describe('Sidebar', () => {
     expect(mondaySections).toHaveLength(1)
   })
 
-  it('renders Inbox as the first item in the top nav', () => {
+  it('renders Lab Home as the first item in the top nav', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} inboxCount={5} />)
     const topNav = screen.getByTestId('sidebar-top-nav')
     const items = topNav.children
-    expect(items[0].textContent).toContain('Inbox')
+    expect(items[0].textContent).toContain('Lab Home')
     expect(items[1].textContent).toContain('All Notes')
   })
 
-  it('displays inbox count badge', () => {
-    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} inboxCount={12} />)
-    expect(screen.getByText('12')).toBeInTheDocument()
+  it('displays all notes count badge', () => {
+    render(<Sidebar entries={mockEntries} selection={{ kind: 'filter', filter: 'labHome' }} onSelect={() => {}} inboxCount={12} />)
+    const allNotesItem = screen.getByText('All Notes').closest('[class*="cursor-pointer"]') as HTMLElement
+    expect(within(allNotesItem).getByTestId('sidebar-count-chip')).toBeInTheDocument()
   })
 
-  it('calls onSelect with inbox filter when clicking Inbox', () => {
+  it('calls onSelect with lab home filter when clicking Lab Home', () => {
     const onSelect = vi.fn()
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={onSelect} inboxCount={3} />)
-    fireEvent.click(screen.getByText('Inbox'))
-    expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'inbox' })
+    fireEvent.click(screen.getByText('Lab Home'))
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'labHome' })
   })
 
-  it('hides Inbox when explicit organization is disabled', () => {
+  it('keeps Lab Home visible when explicit organization is disabled', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} showInbox={false} inboxCount={3} />)
     expect(screen.queryByText('Inbox')).not.toBeInTheDocument()
     const topNav = screen.getByTestId('sidebar-top-nav')
-    expect(topNav.children[0].textContent).toContain('All Notes')
+    expect(topNav.children[0].textContent).toContain('Lab Home')
   })
 
   it('excludes attachments-folder markdown from top-nav note totals', () => {
@@ -1468,10 +1469,10 @@ describe('Sidebar', () => {
 
     it('aligns top-nav count pills to the same trailing column as view rows', () => {
       render(
-        <Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} inboxCount={12} views={mockViews} />
+        <Sidebar entries={mockEntries} selection={{ kind: 'filter', filter: 'labHome' }} onSelect={() => {}} inboxCount={12} views={mockViews} />
       )
 
-      const topNavItem = screen.getByText('Inbox').closest('[class*="cursor-pointer"]') as HTMLElement
+      const topNavItem = screen.getByText('All Notes').closest('[class*="cursor-pointer"]') as HTMLElement
       const topNavCount = within(topNavItem).getByTestId('sidebar-count-chip')
       const viewItem = screen.getByText('Active Projects').closest('[class*="cursor-pointer"]') as HTMLElement
       const viewCount = within(viewItem).getByTestId('view-count-chip')

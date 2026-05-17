@@ -1,4 +1,4 @@
-import { Archive, FileText, Tray } from '@phosphor-icons/react'
+import { Archive, FileText, House } from '@phosphor-icons/react'
 import type { SidebarSelection } from '../../types'
 import { isSelectionActive, NavItem } from '../SidebarParts'
 import { translate, type AppLocale } from '../../lib/i18n'
@@ -14,31 +14,24 @@ interface SidebarTopNavProps {
   loading?: boolean
 }
 
-export function SidebarTopNav({
-  selection,
-  onSelect,
-  showInbox,
-  inboxCount,
-  activeCount,
-  archivedCount,
-  locale = 'en',
-  loading = false,
-}: SidebarTopNavProps) {
+export function SidebarTopNav(props: SidebarTopNavProps) {
+  const {
+    selection,
+    onSelect,
+    activeCount,
+    archivedCount,
+    locale = 'en',
+    loading = false,
+  } = props
+
   return (
     <div className="border-b border-border" data-testid="sidebar-top-nav" style={{ padding: '4px 6px' }}>
-      {showInbox && (
-        <NavItem
-          icon={Tray}
-          label={translate(locale, 'sidebar.nav.inbox')}
-          count={inboxCount}
-          countLoading={loading}
-          isActive={isSelectionActive(selection, { kind: 'filter', filter: 'inbox' })}
-          badgeClassName="text-muted-foreground"
-          badgeStyle={{ background: 'var(--muted)' }}
-          activeBadgeClassName="bg-primary text-primary-foreground"
-          onClick={() => onSelect({ kind: 'filter', filter: 'inbox' })}
-        />
-      )}
+      <NavItem
+        icon={House}
+        label={translate(locale, 'sidebar.nav.labHome')}
+        isActive={isSelectionActive(selection, { kind: 'filter', filter: 'labHome' })}
+        onClick={() => onSelect({ kind: 'filter', filter: 'labHome' })}
+      />
       <NavItem
         icon={FileText}
         label={translate(locale, 'sidebar.nav.allNotes')}

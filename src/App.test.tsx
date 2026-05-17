@@ -521,8 +521,15 @@ describe('App', () => {
 
   it('loads and displays vault entries in sidebar', async () => {
     render(<App />)
+    const labHomePlaceholder = await screen.findByTestId('lab-home-placeholder')
+
+    await act(async () => {
+      fireEvent.click(within(labHomePlaceholder).getByRole('button', { name: 'All Notes' }))
+      await Promise.resolve()
+    })
+
     await waitFor(() => {
-      // Entries appear in both Sidebar and NoteList
+      // Entries appear in the note list once Lab Home opens All Notes.
       expect(screen.getAllByText('Test Project').length).toBeGreaterThan(0)
       expect(screen.getAllByText('Software Development').length).toBeGreaterThan(0)
     })
@@ -539,7 +546,7 @@ describe('App', () => {
 
     expect(await screen.findByTestId('sidebar-loading-favorites', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByTestId('vault-loading-skeleton')).not.toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-top-nav')).toHaveTextContent('Inbox')
+    expect(screen.getByTestId('sidebar-top-nav')).toHaveTextContent('Lab Home')
     expect(screen.getByTestId('sidebar-loading-views')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-loading-types')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-loading-folders')).toBeInTheDocument()
@@ -657,7 +664,15 @@ describe('App', () => {
       await waitFor(() => {
         expect(window.__laputaTest?.activeTabPath).toBe('/vault/untitled-note-1700000000.md')
       })
-      expect(screen.getAllByText('Untitled Note 1700000000').length).toBeGreaterThan(0)
+
+      await act(async () => {
+        fireEvent.click(within(screen.getByTestId('lab-home-placeholder')).getByRole('button', { name: 'All Notes' }))
+        await Promise.resolve()
+      })
+
+      await waitFor(() => {
+        expect(screen.getAllByText('Untitled Note 1700000000').length).toBeGreaterThan(0)
+      })
     } finally {
       dateNow.mockRestore()
     }
@@ -1088,12 +1103,24 @@ describe('App', () => {
     configureNeighborhoodVault()
 
     render(<App />)
+    const labHomePlaceholder = await screen.findByTestId('lab-home-placeholder')
+
+    await waitFor(() => {
+      expect(within(labHomePlaceholder).getByRole('button', { name: 'All Notes' })).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      fireEvent.click(within(labHomePlaceholder).getByRole('button', { name: 'All Notes' }))
+      await Promise.resolve()
+    })
 
     const noteListContainer = await screen.findByTestId('note-list-container', {}, { timeout: 5000 })
     const getHeader = () => getHeaderForNoteList(noteListContainer)
+    let initialHeaderText = ''
 
     await waitFor(() => {
-      expect(getHeader()).toHaveTextContent('Inbox')
+      initialHeaderText = getHeader().textContent ?? ''
+      expect(initialHeaderText.length).toBeGreaterThan(0)
     })
 
     await enterNeighborhood(noteListContainer, 'Alpha')
@@ -1128,9 +1155,20 @@ describe('App', () => {
     await pressEscape()
 
     await waitFor(() => {
-      expect(getHeader()).toHaveTextContent('Inbox')
+      expect(getHeader()).toHaveTextContent(initialHeaderText)
     })
   }, 10_000)
+
+  it('lands on Lab Home by default when explicit organization is enabled', async () => {
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('lab-home-placeholder')).toHaveTextContent('Lab Home')
+    })
+
+    expect(screen.queryByTestId('note-list-container')).not.toBeInTheDocument()
+    expect(within(screen.getByTestId('sidebar-top-nav')).queryByText('Inbox')).not.toBeInTheDocument()
+  })
 
   it('opens favorites directly into Neighborhood mode', async () => {
     configureNeighborhoodFavoritesVault()
@@ -1187,6 +1225,14 @@ describe('App', () => {
 
     render(<App />)
 
+    await waitFor(() => {
+      expect(typeof window.__laputaTest?.dispatchBrowserMenuCommand).toBe('function')
+    })
+
+    act(() => {
+      window.__laputaTest?.dispatchBrowserMenuCommand?.('go-inbox')
+    })
+
     const noteListContainer = await screen.findByTestId('note-list-container')
     await waitFor(() => {
       expect(getHeaderForNoteList(noteListContainer)).toHaveTextContent('Inbox')
@@ -1219,6 +1265,14 @@ describe('App', () => {
     mockCommandResults.save_note_content = vi.fn(() => organizeSave)
 
     render(<App />)
+
+    await waitFor(() => {
+      expect(typeof window.__laputaTest?.dispatchBrowserMenuCommand).toBe('function')
+    })
+
+    act(() => {
+      window.__laputaTest?.dispatchBrowserMenuCommand?.('go-inbox')
+    })
 
     const noteListContainer = await screen.findByTestId('note-list-container')
     await waitFor(() => {

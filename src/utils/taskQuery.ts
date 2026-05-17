@@ -1,5 +1,6 @@
+import { parseFrontmatter } from './frontmatter'
 import { toDateFilterTimestamp } from './filterDates'
-import { splitFrontmatter } from './wikilinks'
+import { extractInlineTags, splitFrontmatter } from './wikilinks'
 
 const TASK_LINE_RE = /^(\s*)(?:[-*+]|\d+\.)\s+\[([^\]])\]\s+(.*)$/u
 const FENCE_DELIMITER_RE = /^( {0,3})(`{3,}|~{3,})[ \t]*(.*)$/u
@@ -47,6 +48,7 @@ export interface MarkdownTask {
   prioritySymbol: string | null
   description: string
   rawText: string
+  tags: string[]
   dueDate: string | null
   scheduledDate: string | null
   doneDate: string | null
@@ -59,6 +61,7 @@ export interface TaskQueryDefinition {
   donePresence: TaskDatePresence
   descriptionIncludes: string[]
   pathIncludes: string[]
+  tagIncludes: string[]
   dueComparisons: TaskDateComparison[]
   scheduledComparisons: TaskDateComparison[]
   doneComparisons: TaskDateComparison[]
@@ -139,11 +142,36 @@ function stripTaskMetadata(rawText: string): string {
     .trim()
 }
 
+function normalizeTag(tag: string): string {
+  return tag.trim().replace(/^#+/u, '').toLowerCase()
+}
+
+function normalizeTagItems(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map(String).map(normalizeTag).filter(Boolean)
+  if (typeof value !== 'string') return []
+
+  const normalized = normalizeTag(value)
+  return normalized ? [normalized] : []
+}
+
+function readNoteTags(content: string): string[] {
+  const frontmatter = parseFrontmatter(content)
+  const frontmatterTagKey = Object.keys(frontmatter).find((key) => key.trim().toLowerCase() === 'tags')
+  const merged = new Set(normalizeTagItems(frontmatterTagKey ? frontmatter[frontmatterTagKey] : undefined))
+
+  for (const tag of extractInlineTags(content)) {
+    const normalized = normalizeTag(tag)
+    if (normalized) merged.add(normalized)
+  }
+
+  return [...merged]
+}
+
 function isFenceDelimiter(line: string): boolean {
   return FENCE_DELIMITER_RE.test(line)
 }
 
-function buildTask(path: string, lineNumber: number, lineText: string): MarkdownTask | null {
+function buildTask(path: string, lineNumber: number, lineText: string, tags: string[]): MarkdownTask | null {
   const match = TASK_LINE_RE.exec(lineText)
   if (!match) return null
 
@@ -162,6 +190,7 @@ function buildTask(path: string, lineNumber: number, lineText: string): Markdown
     prioritySymbol,
     description: stripTaskMetadata(rawText),
     rawText,
+    tags,
     dueDate,
     scheduledDate,
     doneDate,
@@ -173,6 +202,7 @@ export function extractTasksFromNoteContent(path: string, content: string): Mark
   const lineOffset = countLineBreaks(frontmatter)
   const lines = body.split(/\r?\n/u)
   const tasks: MarkdownTask[] = []
+  const noteTags = readNoteTags(content)
   let inCodeBlock = false
 
   for (const [index, line] of lines.entries()) {
@@ -182,7 +212,7 @@ export function extractTasksFromNoteContent(path: string, content: string): Mark
     }
     if (inCodeBlock) continue
 
-    const task = buildTask(path, lineOffset + index + 1, line)
+    const task = buildTask(path, lineOffset + index + 1, line, noteTags)
     if (task) tasks.push(task)
   }
 
@@ -281,6 +311,15 @@ function parseTaskQueryLine(line: string, query: TaskQueryDefinition, referenceD
     return
   }
 
+  const tagIncludesMatch = /^tags?\s+include(?:s)?\s+(.+)$/iu.exec(trimmed)
+  if (tagIncludesMatch?.[1]) {
+    const normalizedTag = normalizeTag(tagIncludesMatch[1])
+    if (normalizedTag) {
+      query.tagIncludes.push(normalizedTag)
+      return
+    }
+  }
+
   const limitMatch = /^limit\s+(\d+)$/iu.exec(trimmed)
   if (limitMatch?.[1]) {
     query.limit = Number(limitMatch[1])
@@ -344,6 +383,7 @@ export function parseTaskQuery(queryText: string, referenceDate = new Date()): T
     donePresence: 'any',
     descriptionIncludes: [],
     pathIncludes: [],
+    tagIncludes: [],
     dueComparisons: [],
     scheduledComparisons: [],
     doneComparisons: [],
@@ -434,6 +474,7 @@ function taskMatchesQuery(task: MarkdownTask, query: TaskQueryDefinition): boole
   if (!taskMatchesDatePresence(task.doneDate, query.donePresence)) return false
   if (query.pathIncludes.some((value) => !normalizePath(task.path).includes(value))) return false
   if (query.descriptionIncludes.some((value) => !task.description.toLowerCase().includes(value))) return false
+  if (query.tagIncludes.some((value) => !task.tags.includes(value))) return false
   if (query.dueComparisons.some((comparison) => !taskMatchesDateComparison(task.dueDate, comparison))) return false
   if (query.scheduledComparisons.some((comparison) => !taskMatchesDateComparison(task.scheduledDate, comparison))) return false
   if (query.doneComparisons.some((comparison) => !taskMatchesDateComparison(task.doneDate, comparison))) return false

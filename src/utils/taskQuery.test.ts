@@ -51,6 +51,7 @@ describe('taskQuery', () => {
       'not done',
       'path includes project',
       'description includes spec',
+      'Tags include #PM/filiere/spring2026',
       'due before tomorrow',
       'priority is high',
       'sort by priority',
@@ -64,6 +65,7 @@ describe('taskQuery', () => {
       status: 'not_done',
       pathIncludes: ['project'],
       descriptionIncludes: ['spec'],
+      tagIncludes: ['pm/filiere/spring2026'],
       limit: 5,
       groupBy: 'filename',
       explain: true,
@@ -101,6 +103,42 @@ describe('taskQuery', () => {
         key: 'beta.md',
         tasks: [expect.objectContaining({ description: 'Review draft' })],
       },
+    ])
+  })
+
+  it('filters tasks by merged note tags', () => {
+    const result = executeTaskQuery({
+      queryText: [
+        'not done',
+        'Tags include #PM/filiere/spring2026',
+        'sort by path',
+      ].join('\n'),
+      contentByPath: {
+        '/vault/project/alpha.md': [
+          '---',
+          'Tags:',
+          '  - PM/filiere/spring2026',
+          '---',
+          '# Alpha',
+          '',
+          '- [ ] Frontmatter task',
+        ].join('\n'),
+        '/vault/project/beta.md': [
+          '# Beta',
+          '',
+          '- [ ] Inline tag task #PM/filiere/spring2026',
+        ].join('\n'),
+        '/vault/project/gamma.md': [
+          '# Gamma',
+          '',
+          '- [ ] Different tag task #PM/filiere/fall2026',
+        ].join('\n'),
+      },
+    })
+
+    expect(result.tasks.map((task) => `${task.path}:${task.description}`)).toEqual([
+      '/vault/project/alpha.md:Frontmatter task',
+      '/vault/project/beta.md:Inline tag task #PM/filiere/spring2026',
     ])
   })
 

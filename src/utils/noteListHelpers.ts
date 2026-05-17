@@ -548,6 +548,7 @@ function filterByKind(
 }
 
 function filterByFilterType(entries: VaultEntry[], filter: string): VaultEntry[] {
+  if (filter === 'labHome') return []
   if (filter === 'all') return entries.filter(isActive)
   if (filter === 'archived') return entries.filter((e) => e.archived)
   if (filter === 'favorites') return entries.filter((e) => e.favorite && !e.archived)
