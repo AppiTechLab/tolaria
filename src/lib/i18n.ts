@@ -178,29 +178,12 @@ for (const locale of APP_LOCALES) {
   }
 }
 
-const LOCALE_MODULES = import.meta.glob('./locales/*.json', { eager: true, import: 'default' }) as Record<string, TranslationCatalog>
-const TRANSLATIONS: Partial<Record<AppLocale, Partial<Record<TranslationKey, string>>>> = buildTranslations()
+const TRANSLATIONS: Partial<Record<AppLocale, Partial<Record<TranslationKey, string>>>> = {
+  en: EN_TRANSLATIONS,
+}
 
 export const APP_LOCALE_DEFINITIONS = APP_LOCALES.map((locale) => getLocaleDefinition(locale))
 export { EN_TRANSLATIONS }
-
-function buildTranslations() {
-  const translations: Partial<Record<AppLocale, Partial<Record<TranslationKey, string>>>> = {
-    en: EN_TRANSLATIONS,
-  }
-
-  for (const [path, catalog] of Object.entries(LOCALE_MODULES)) {
-    const match = path.match(/\/([^/]+)\.json$/)
-    if (!match) continue
-
-    const locale = normalizeLocaleCode(match[1])
-    if (!locale || locale === 'en') continue
-
-    Reflect.set(translations, locale, catalog)
-  }
-
-  return translations
-}
 
 function isAppLocale(value: string): value is AppLocale {
   return APP_LOCALE_SET.has(value as AppLocale)
@@ -225,7 +208,7 @@ export function interpolate(template: string, values: TranslationValues = {}): s
 }
 
 function localizedInterpolationValues(locale: AppLocale, values?: TranslationValues): TranslationValues | undefined {
-  if (!values || locale === 'en' || values.plural === undefined) return values
+  if (!values || locale === 'en' || values.plural === undefined || !hasLocaleCatalog(locale)) return values
   return { ...values, plural: '' }
 }
 
@@ -277,16 +260,8 @@ export function resolveEffectiveLocale(
   preference: unknown,
   languagePreferences: readonly string[] = getBrowserLanguagePreferences(),
 ): AppLocale {
-  const normalizedPreference = normalizeUiLanguagePreference(preference)
-  if (normalizedPreference && normalizedPreference !== SYSTEM_UI_LANGUAGE) {
-    return normalizedPreference
-  }
-
-  for (const language of languagePreferences) {
-    const locale = normalizeLocaleCode(language)
-    if (locale) return locale
-  }
-
+  void preference
+  void languagePreferences
   return DEFAULT_APP_LOCALE
 }
 
@@ -299,11 +274,11 @@ export function localeSearchKeywords(locale: AppLocale): readonly string[] {
 }
 
 export function hasLocaleCatalog(locale: AppLocale): boolean {
-  return locale === 'en' || Boolean(Reflect.get(TRANSLATIONS, locale))
+  return locale === 'en'
 }
 
 export function localeCatalogLocales(): AppLocale[] {
-  return APP_LOCALES.filter((locale) => hasLocaleCatalog(locale))
+  return ['en']
 }
 
 export function isCanonicalAppLocale(value: string): value is AppLocale {

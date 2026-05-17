@@ -2,10 +2,8 @@ import { createContext, createElement, useCallback, useContext, useEffect, useMe
 import type { Settings } from '../types'
 import type { ThemeMode } from '../lib/themeMode'
 import {
+  DEFAULT_APP_LOCALE,
   SYSTEM_UI_LANGUAGE,
-  getBrowserLanguagePreferences,
-  resolveEffectiveLocale,
-  serializeUiLanguagePreference,
   type UiLanguagePreference,
 } from '../lib/i18n'
 import { DEFAULT_DATE_DISPLAY_FORMAT, normalizeDateDisplayFormat, type DateDisplayFormat } from '../utils/dateDisplay'
@@ -56,14 +54,8 @@ export function useAppPreferences({
   settings,
   settingsLoaded,
 }: AppPreferencesConfig) {
-  const systemLocale = useMemo(
-    () => resolveEffectiveLocale(SYSTEM_UI_LANGUAGE, getBrowserLanguagePreferences()),
-    [],
-  )
-  const appLocale = useMemo(
-    () => resolveEffectiveLocale(settings.ui_language, [systemLocale]),
-    [settings.ui_language, systemLocale],
-  )
+  const systemLocale = DEFAULT_APP_LOCALE
+  const appLocale = DEFAULT_APP_LOCALE
   const dateDisplayFormat = useMemo(
     () => normalizeDateDisplayFormat(settings.date_display_format) ?? DEFAULT_DATE_DISPLAY_FORMAT,
     [settings.date_display_format],
@@ -72,7 +64,7 @@ export function useAppPreferences({
     () => resolveAllNotesFileVisibility(settings),
     [settings],
   )
-  const selectedUiLanguage: UiLanguagePreference = settings.ui_language ?? SYSTEM_UI_LANGUAGE
+  const selectedUiLanguage: UiLanguagePreference = SYSTEM_UI_LANGUAGE
 
   useEffect(() => {
     document.documentElement.lang = appLocale
@@ -89,7 +81,8 @@ export function useAppPreferences({
     void saveSettings({ ...settings, theme_mode })
   }, [saveSettings, settings, settingsLoaded])
   const handleSetUiLanguage = useCallback((uiLanguage: UiLanguagePreference) => {
-    void saveSettings({ ...settings, ui_language: serializeUiLanguagePreference(uiLanguage) })
+    void uiLanguage
+    void saveSettings({ ...settings, ui_language: null })
   }, [saveSettings, settings])
   const aiAgentPreferences = useAiAgentPreferences({
     settings,

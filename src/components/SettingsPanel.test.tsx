@@ -203,7 +203,7 @@ describe('SettingsPanel', () => {
     expectSettingsSaved({ ai_features_enabled: true })
   })
 
-  it('updates the draft language when stored settings finish loading', () => {
+  it('keeps settings in English even when a non-English UI language is stored', () => {
     const { rerender } = render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
@@ -217,8 +217,8 @@ describe('SettingsPanel', () => {
       />
     )
 
-    expect(screen.getByText('设置')).toBeInTheDocument()
-    expect(screen.queryByText('Settings')).not.toBeInTheDocument()
+    expect(screen.getByText('Settings')).toBeInTheDocument()
+    expect(screen.queryByText('设置')).not.toBeInTheDocument()
   }, 10_000)
 
   it('calls onSave with stable defaults on save', () => {
@@ -421,20 +421,17 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'false')
   })
 
-  it('defaults the language selector to system language', () => {
+  it('does not render a language selector', () => {
     render(
       <SettingsPanel
         open={true}
         settings={emptySettings}
-        locale="en"
-        systemLocale="zh-CN"
         onSave={onSave}
         onClose={onClose}
       />
     )
 
-    expect(screen.getByTestId('settings-ui-language')).toHaveAttribute('data-value', 'system')
-    expect(screen.getByText('系统（简体中文）')).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-ui-language')).not.toBeInTheDocument()
   })
 
   it('defaults date display to friendly, note width to normal, and sidebar type pluralization to enabled', () => {
@@ -491,32 +488,20 @@ describe('SettingsPanel', () => {
     expect(trackEventMock).toHaveBeenCalledWith('date_display_format_changed', { format: 'iso' })
   })
 
-  it('keeps the language selector keyboard accessible', () => {
+  it('clears a stored UI language when settings are saved', () => {
     render(
-      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, ui_language: 'zh-CN' }}
+        onSave={onSave}
+        onClose={onClose}
+      />
     )
-
-    const trigger = screen.getByTestId('settings-ui-language')
-    trigger.focus()
-    fireEvent.keyDown(trigger, { key: 'ArrowDown', code: 'ArrowDown' })
-
-    expect(screen.getByRole('option', { name: 'Simplified Chinese' })).toBeInTheDocument()
-  })
-
-  it('saves the selected UI language and updates visible settings text', () => {
-    render(
-      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
-    )
-
-    fireEvent.pointerDown(screen.getByTestId('settings-ui-language'), { button: 0, pointerType: 'mouse' })
-    fireEvent.click(screen.getByRole('option', { name: 'Simplified Chinese' }))
-
-    expect(screen.getByText('设置')).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('settings-save'))
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      ui_language: 'zh-CN',
+      ui_language: null,
     }))
   })
 

@@ -26,12 +26,8 @@ import { Moon, Sun, X } from '@phosphor-icons/react'
 import { Copy, Monitor } from 'lucide-react'
 import type { Settings } from '../types'
 import {
-  APP_LOCALES,
   SYSTEM_UI_LANGUAGE,
   createTranslator,
-  localeDisplayName,
-  resolveEffectiveLocale,
-  serializeUiLanguagePreference,
   type AppLocale,
   type UiLanguagePreference,
 } from '../lib/i18n'
@@ -280,7 +276,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     anonymous_id: resolveAnonymousId(settings, draft),
     release_channel: serializeReleaseChannel(draft.releaseChannel),
     theme_mode: draft.themeMode,
-    ui_language: serializeUiLanguagePreference(draft.uiLanguage),
+    ui_language: null,
     date_display_format: draft.dateDisplayFormat,
     note_width_mode: draft.defaultNoteWidth,
     sidebar_type_pluralization_enabled: draft.sidebarTypePluralizationEnabled,
@@ -368,7 +364,7 @@ function SettingsPanelInner({
   settings,
   aiAgentsStatus,
   initialSectionId,
-  systemLocale,
+  locale,
   onSave,
   onCopyMcpConfig,
   vaults,
@@ -388,8 +384,7 @@ function SettingsPanelInner({
   const [researchLabModeDraft, setResearchLabModeDraft] = useState(() => normalizeResearchLabModeConfig(researchLabMode))
   const [researchLabModeValidation, setResearchLabModeValidation] = useState<ResearchLabValidationResult | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const draftLocale = resolveEffectiveLocale(draft.uiLanguage, [systemLocale])
-  const t = createTranslator(draftLocale)
+  const t = createTranslator(locale)
 
   useEffect(() => {
     setDraft(createSettingsDraft(settings, explicitOrganizationEnabled))
@@ -512,8 +507,7 @@ function SettingsPanelInner({
         <SettingsBodyFromDraft
           t={t}
           draft={draft}
-          locale={draftLocale}
-          systemLocale={systemLocale}
+          locale={locale}
           updateDraft={updateDraft}
           isGitVault={isGitVault}
           aiAgentsStatus={aiAgentsStatus}
@@ -563,7 +557,6 @@ interface SettingsBodyFromDraftProps {
   t: Translate
   draft: SettingsDraft
   locale: AppLocale
-  systemLocale: AppLocale
   updateDraft: <Key extends keyof SettingsDraft>(key: Key, value: SettingsDraft[Key]) => void
   isGitVault: boolean
   aiAgentsStatus: AiAgentsStatus
@@ -588,7 +581,6 @@ function SettingsBodyFromDraft({
   t,
   draft,
   locale,
-  systemLocale,
   updateDraft,
   isGitVault,
   aiAgentsStatus,
@@ -612,7 +604,6 @@ function SettingsBodyFromDraft({
     <SettingsBody
       t={t}
       locale={locale}
-      systemLocale={systemLocale}
       pullInterval={draft.pullInterval}
       setPullInterval={(value) => updateDraft('pullInterval', value)}
       isGitVault={isGitVault}
@@ -638,8 +629,6 @@ function SettingsBodyFromDraft({
       setReleaseChannel={(value) => updateDraft('releaseChannel', value)}
       themeMode={draft.themeMode}
       setThemeMode={setThemeMode}
-      uiLanguage={draft.uiLanguage}
-      setUiLanguage={(value) => updateDraft('uiLanguage', value)}
       dateDisplayFormat={draft.dateDisplayFormat}
       setDateDisplayFormat={(value) => updateDraft('dateDisplayFormat', value)}
       defaultNoteWidth={draft.defaultNoteWidth}
@@ -691,7 +680,6 @@ function SettingsBody(props: SettingsBodyProps) {
 function SettingsSyncAndAppearanceSections({
   t,
   locale,
-  systemLocale,
   pullInterval,
   setPullInterval,
   isGitVault,
@@ -712,8 +700,6 @@ function SettingsSyncAndAppearanceSections({
   onUpdateWorkspaceIdentity,
   themeMode,
   setThemeMode,
-  uiLanguage,
-  setUiLanguage,
 }: SettingsBodyProps) {
   return (
     <>
@@ -759,13 +745,6 @@ function SettingsSyncAndAppearanceSections({
             t={t}
             themeMode={themeMode}
             setThemeMode={setThemeMode}
-          />
-          <LanguageSettingsSection
-            t={t}
-            locale={locale}
-            systemLocale={systemLocale}
-            uiLanguage={uiLanguage}
-            setUiLanguage={setUiLanguage}
           />
         </SettingsGroup>
       </SettingsSection>
@@ -1082,44 +1061,6 @@ function AutoGitSettingsSection({
         </SettingsRow>
       </SettingsGroup>
     </>
-  )
-}
-
-function buildLanguageOptions(t: Translate, locale: AppLocale, systemLocale: AppLocale) {
-  return [
-    {
-      value: SYSTEM_UI_LANGUAGE,
-      label: t('settings.language.system', {
-        language: localeDisplayName(systemLocale, locale),
-      }),
-    },
-    ...APP_LOCALES.map((appLocale) => ({
-      value: appLocale,
-      label: localeDisplayName(appLocale, locale),
-    })),
-  ]
-}
-
-function LanguageSettingsSection({
-  t,
-  locale,
-  systemLocale,
-  uiLanguage,
-  setUiLanguage,
-}: Pick<SettingsBodyProps, 't' | 'locale' | 'systemLocale' | 'uiLanguage' | 'setUiLanguage'>) {
-  return (
-    <SettingsRow
-      label={t('settings.language.title')}
-      description={`${t('settings.language.description')} ${t('settings.language.summary')}`}
-    >
-      <SelectControl
-        ariaLabel={t('settings.language.label')}
-        value={uiLanguage}
-        onValueChange={(value) => setUiLanguage(value as UiLanguagePreference)}
-        options={buildLanguageOptions(t, locale, systemLocale)}
-        testId="settings-ui-language"
-      />
-    </SettingsRow>
   )
 }
 

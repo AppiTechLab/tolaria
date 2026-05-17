@@ -11,12 +11,12 @@ import {
 } from './i18n'
 
 describe('i18n', () => {
-  it('uses supported system languages before falling back to English', () => {
-    expect(resolveEffectiveLocale(null, ['zh-CN'])).toBe('zh-CN')
-    expect(resolveEffectiveLocale(null, ['zh-TW'])).toBe('zh-TW')
-    expect(resolveEffectiveLocale(null, ['es-MX'])).toBe('es-419')
-    expect(resolveEffectiveLocale('system', ['fr-FR'])).toBe('fr-FR')
-    expect(resolveEffectiveLocale('system', ['xx-ZZ'])).toBe('en')
+  it('always resolves the effective locale to English', () => {
+    expect(resolveEffectiveLocale(null, ['zh-CN'])).toBe('en')
+    expect(resolveEffectiveLocale(null, ['zh-TW'])).toBe('en')
+    expect(resolveEffectiveLocale(null, ['es-MX'])).toBe('en')
+    expect(resolveEffectiveLocale('system', ['fr-FR'])).toBe('en')
+    expect(resolveEffectiveLocale('zh-CN', ['xx-ZZ'])).toBe('en')
   })
 
   it('normalizes current and legacy language preferences', () => {
@@ -43,9 +43,9 @@ describe('i18n', () => {
   })
 
   it('formats locale display names in the active language', () => {
-    expect(localeDisplayName('zh-CN', 'zh-CN')).toBe('简体中文')
-    expect(localeDisplayName('zh-TW', 'zh-TW')).toBe('繁體中文')
-    expect(localeDisplayName('en', 'zh-CN')).toBe('英文')
+    expect(localeDisplayName('zh-CN', 'zh-CN')).toBe('Simplified Chinese')
+    expect(localeDisplayName('zh-TW', 'zh-TW')).toBe('Traditional Chinese')
+    expect(localeDisplayName('en', 'zh-CN')).toBe('English')
     expect(localeDisplayName('es-419', 'en')).toBe('Spanish (Latin America)')
   })
 
@@ -55,12 +55,12 @@ describe('i18n', () => {
   })
 
   it('loads a translation catalog for every configured locale', () => {
-    expect(localeCatalogLocales()).toEqual(APP_LOCALES)
+    expect(localeCatalogLocales()).toEqual(['en'])
   })
 
-  it('drops English-only plural suffix values for non-English locales', () => {
+  it('falls back to English strings when a non-English locale is requested', () => {
     expect(translate('en', 'status.conflict.count', { count: 2, plural: 's' })).toBe('2 conflicts')
-    expect(translate('zh-CN', 'status.conflict.count', { count: 2, plural: 's' })).toBe('2 个冲突')
-    expect(translate('zh-TW', 'status.conflict.count', { count: 2, plural: 's' })).toBe('2 個衝突')
+    expect(translate('zh-CN', 'status.conflict.count', { count: 2, plural: 's' })).toBe('2 conflicts')
+    expect(translate('zh-TW', 'status.conflict.count', { count: 2, plural: 's' })).toBe('2 conflicts')
   })
 })

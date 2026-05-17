@@ -3,11 +3,7 @@ import type { CommandAction } from './types'
 import { rememberFeedbackDialogOpener } from '../../lib/feedbackDialogOpener'
 import { requestGitignoredVisibilityToggle } from '../../lib/gitignoredVisibilityEvents'
 import {
-  APP_LOCALES,
-  SYSTEM_UI_LANGUAGE,
   createTranslator,
-  localeDisplayName,
-  localeSearchKeywords,
   type AppLocale,
   type UiLanguagePreference,
 } from '../../lib/i18n'
@@ -81,46 +77,9 @@ function buildPrimarySettingsCommands({
 
 function buildLanguageCommands({
   locale = 'en',
-  systemLocale = locale,
-  selectedUiLanguage = SYSTEM_UI_LANGUAGE,
-  onOpenSettings,
-  onSetUiLanguage,
 }: Pick<SettingsCommandsConfig, 'locale' | 'systemLocale' | 'selectedUiLanguage' | 'onOpenSettings' | 'onSetUiLanguage'>): CommandAction[] {
-  const t = createTranslator(locale)
-  const canSwitchLanguage = !!onSetUiLanguage
-
-  return [
-    {
-      id: 'open-language-settings',
-      label: t('command.openLanguageSettings'),
-      group: 'Settings',
-      keywords: commandKeywords(t('command.openLanguageSettings.keywords')),
-      enabled: true,
-      execute: onOpenSettings,
-    },
-    {
-      id: 'use-system-language',
-      label: `${t('command.useSystemLanguage')} (${localeDisplayName(systemLocale, locale)})`,
-      group: 'Settings',
-      keywords: ['language', 'locale', 'system', 'auto'],
-      enabled: canSwitchLanguage && selectedUiLanguage !== SYSTEM_UI_LANGUAGE,
-      execute: () => onSetUiLanguage?.(SYSTEM_UI_LANGUAGE),
-    },
-    ...APP_LOCALES.map((targetLocale) => ({
-      id: `switch-language-${targetLocale.toLowerCase()}`,
-      label: t('command.switchLanguage', {
-        language: localeDisplayName(targetLocale, locale),
-      }),
-      group: 'Settings' as const,
-      keywords: [
-        'language',
-        'locale',
-        ...localeSearchKeywords(targetLocale),
-      ],
-      enabled: canSwitchLanguage && selectedUiLanguage !== targetLocale,
-      execute: () => onSetUiLanguage?.(targetLocale),
-    })),
-  ]
+  void locale
+  return []
 }
 
 function buildThemeCommands({
@@ -208,7 +167,7 @@ export function buildSettingsCommands(config: SettingsCommandsConfig): CommandAc
     mcpStatus, vaultCount, isGettingStartedHidden,
     onOpenSettings, onOpenFeedback, onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
     onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onToggleGitignoredFilesVisibility,
-    locale = 'en', systemLocale = locale, selectedUiLanguage = SYSTEM_UI_LANGUAGE, onSetUiLanguage, onSetThemeMode,
+    locale = 'en', systemLocale = locale, selectedUiLanguage, onSetUiLanguage, onSetThemeMode,
   } = config
 
   return [

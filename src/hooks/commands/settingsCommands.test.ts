@@ -38,28 +38,12 @@ describe('buildSettingsCommands', () => {
     })
   })
 
-  it('adds a discoverable language settings command', () => {
-    expectOpenSettingsCommand('open-language-settings', 'Open Language Settings')
-  })
+  it('does not add language settings commands', () => {
+    const commands = buildSettingsCommands({ onOpenSettings: vi.fn(), onSetUiLanguage: vi.fn() })
 
-  it('adds language switch commands when a setter is available', () => {
-    const onOpenSettings = vi.fn()
-    const onSetUiLanguage = vi.fn()
-
-    const commands = buildSettingsCommands({
-      onOpenSettings,
-      selectedUiLanguage: 'en',
-      onSetUiLanguage,
-    })
-
-    const chinese = commands.find((item) => item.id === 'switch-language-zh-cn')
-    expect(chinese).toMatchObject({
-      label: 'Switch Language to Simplified Chinese',
-      enabled: true,
-    })
-
-    chinese?.execute()
-    expect(onSetUiLanguage).toHaveBeenCalledWith('zh-CN')
+    expect(commands.find((item) => item.id === 'open-language-settings')).toBeUndefined()
+    expect(commands.find((item) => item.id === 'use-system-language')).toBeUndefined()
+    expect(commands.find((item) => item.id === 'switch-language-zh-cn')).toBeUndefined()
   })
 
   it('adds direct theme mode commands when a setter is available', () => {
@@ -119,27 +103,17 @@ describe('buildSettingsCommands', () => {
     })
   })
 
-  it('localizes language commands', () => {
+  it('falls back to English command labels when a non-English locale is requested', () => {
     const commands = buildSettingsCommands({
       onOpenSettings: vi.fn(),
       locale: 'zh-CN',
-      systemLocale: 'zh-CN',
-      selectedUiLanguage: 'system',
-      onSetUiLanguage: vi.fn(),
     })
 
-    expect(commands.find((item) => item.id === 'open-language-settings')).toMatchObject({
-      label: '打开语言设置',
-    })
-    expect(commands.find((item) => item.id === 'use-system-language')).toMatchObject({
-      label: '使用系统语言 (简体中文)',
-      enabled: false,
-    })
     expect(commands.find((item) => item.id === 'use-light-mode')).toMatchObject({
-      label: '使用浅色模式',
+      label: 'Use Light Mode',
     })
     expect(commands.find((item) => item.id === 'use-system-theme-mode')).toMatchObject({
-      label: '使用系统主题',
+      label: 'Use System Theme',
     })
   })
 
