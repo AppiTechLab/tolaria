@@ -11,7 +11,9 @@ function escapeLinkText(text: string): string {
 }
 
 function replaceWikilinksInText(text: string): string {
-  return text.replace(/\[\[([^\]]+)\]\]/g, (_, inner: string) => {
+  return text.replace(/\[\[([^\]]+)\]\]/g, (match, inner: string, offset: number, source: string) => {
+    if (offset > 0 && source.charAt(offset - 1) === '!') return match
+
     const pipeIdx = inner.indexOf('|')
     const target = pipeIdx !== -1 ? inner.slice(0, pipeIdx) : inner
     const display = pipeIdx !== -1 ? inner.slice(pipeIdx + 1) : inner

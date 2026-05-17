@@ -29,6 +29,10 @@ describe('preProcessWikilinks', () => {
     expect(result).toContain('WIKILINK:B')
   })
 
+  it('leaves embedded note syntax untouched', () => {
+    expect(preProcessWikilinks('![[Embedded Note]]')).toBe('![[Embedded Note]]')
+  })
+
   it('returns unchanged text when no wikilinks', () => {
     const input = 'No links here'
     expect(preProcessWikilinks(input)).toBe(input)

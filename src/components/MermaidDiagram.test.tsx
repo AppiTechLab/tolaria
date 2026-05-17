@@ -43,6 +43,32 @@ describe('MermaidDiagram', () => {
     }))
   })
 
+  it('renders Mermaid inside a measurable hidden host', async () => {
+    let renderHost: HTMLElement | undefined
+    mermaidMock.render.mockImplementationOnce(async (_renderId: string, _diagram: string, container?: HTMLElement) => {
+      renderHost = container
+      return { svg: '<svg aria-label="Rendered Mermaid"><g><text>A to B</text></g></svg>' }
+    })
+
+    render(
+      <MermaidDiagram
+        diagram={'flowchart LR\nA --> B'}
+        source={'```mermaid\nflowchart LR\nA --> B\n```'}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mermaid-diagram-viewport').querySelector('svg')).not.toBeNull()
+    })
+
+    expect(renderHost).toBeDefined()
+    expect(renderHost?.style.position).toBe('fixed')
+    expect(renderHost?.style.width).toBe('1600px')
+    expect(renderHost?.style.minHeight).toBe('1px')
+    expect(renderHost?.style.opacity).toBe('0')
+    expect(renderHost?.style.pointerEvents).toBe('none')
+  })
+
   it('opens the rendered SVG in a lightbox', async () => {
     render(
       <MermaidDiagram

@@ -1,10 +1,32 @@
 import { describe, expect, it, vi } from 'vitest'
+import { EMBEDDED_NOTE_BLOCK_TYPE } from '../utils/embeddedNoteMarkdown'
 import { MERMAID_BLOCK_TYPE } from '../utils/mermaidMarkdown'
 import { TASKS_BLOCK_TYPE } from '../utils/tasksMarkdown'
 import { TLDRAW_BLOCK_TYPE } from '../utils/tldrawMarkdown'
 import { serializeEditorDocumentToMarkdown, syncActiveTabIntoRawBuffer } from './editorRawModeSync'
 
 describe('editorRawModeSync Mermaid serialization', () => {
+  it('keeps the original embedded note source when rich content enters raw mode', () => {
+    const source = '![[note-b]]'
+    const editor = {
+      document: [{
+        id: 'embed-1',
+        type: EMBEDDED_NOTE_BLOCK_TYPE,
+        props: {
+          source,
+          target: 'note-b',
+        },
+        children: [],
+      }],
+      blocksToMarkdownLossy: vi.fn(),
+    }
+
+    expect(serializeEditorDocumentToMarkdown(
+      editor as never,
+      '---\ntitle: Embed\n---\n\n# Embed\n',
+    )).toBe(`---\ntitle: Embed\n---\n${source}\n`)
+  })
+
   it('keeps the original fenced Mermaid source when rich content enters raw mode', () => {
     const source = [
       '~~~mermaid',

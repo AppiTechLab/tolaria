@@ -34,12 +34,15 @@ let initialized = false
 let renderQueue = Promise.resolve()
 
 const MERMAID_RENDER_HOST_STYLE = [
-  'position:absolute',
-  'left:-10000px',
-  'top:-10000px',
-  'width:0',
-  'height:0',
-  'overflow:hidden',
+  'position:fixed',
+  'left:0',
+  'top:0',
+  'width:1600px',
+  'min-height:1px',
+  'overflow:visible',
+  'opacity:0',
+  'pointer-events:none',
+  'z-index:-1',
 ].join(';')
 
 function renderIdFromReactId(reactId: string): string {

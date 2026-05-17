@@ -1506,7 +1506,7 @@ export function SingleEditorView({ editor, entries, onNavigateWikilink, onChange
           <div className="editor__drop-overlay-label">Drop image here</div>
         </div>
       )}
-      <TasksBlockContext.Provider value={{ entries, locale, onNavigateWikilink, vaultPath }}>
+      <TasksBlockContext.Provider value={{ entries, locale, onNavigateWikilink, sourceEntry: sourceEntry ?? undefined, vaultPath }}>
         <BlockNoteRenderRecoveryBoundary onRecover={() => repairEditorDocumentForRenderRecovery(editor)}>
           {(recoveryKey) => (
             <SharedContextBlockNoteView

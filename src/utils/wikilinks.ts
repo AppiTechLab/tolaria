@@ -78,7 +78,11 @@ function replaceWikilinksWithPlaceholders(
   line: MarkdownLine,
   options: WikilinkReplacementOptions,
 ): MarkdownLine {
-  return line.replace(WIKILINK_RE, (_match, target) => wikilinkPlaceholder(target, options))
+  return line.replace(WIKILINK_RE, (match, target, offset, source) => (
+    offset > 0 && source.charAt(offset - 1) === '!'
+      ? match
+      : wikilinkPlaceholder(target, options)
+  ))
 }
 
 function wikilinkPlaceholder(

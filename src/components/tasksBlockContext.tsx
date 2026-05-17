@@ -6,6 +6,7 @@ export interface TasksBlockContextValue {
   entries: VaultEntry[]
   locale: AppLocale
   onNavigateWikilink: (target: string) => void
+  sourceEntry?: VaultEntry
   vaultPath?: string
 }
 
@@ -13,5 +14,6 @@ export const TasksBlockContext = createContext<TasksBlockContextValue>({
   entries: [],
   locale: 'en',
   onNavigateWikilink: () => {},
+  sourceEntry: undefined,
   vaultPath: undefined,
 })

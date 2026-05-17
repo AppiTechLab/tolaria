@@ -128,7 +128,30 @@ test.afterEach(async () => {
 })
 
 async function openNote(page: Page, title: string): Promise<void> {
-  await page.locator('[data-testid="note-list-container"]').getByText(title, { exact: true }).click()
+  const noteList = page.locator('[data-testid="note-list-container"]')
+  const targetNote = noteList.getByText(title, { exact: true }).first()
+
+  if (!await targetNote.isVisible().catch(() => false)) {
+    const searchToggle = page.getByTitle('Search notes')
+    const searchInput = page.getByPlaceholder('Search notes...')
+
+    if (!await searchInput.isVisible().catch(() => false)) {
+      await expect(searchToggle).toBeVisible({ timeout: 5_000 })
+      await searchToggle.click()
+      await expect(searchInput).toBeVisible({ timeout: 5_000 })
+    }
+
+    await searchInput.fill(title)
+
+    const searchLoading = page.getByTestId('note-list-search-loading')
+    if (await searchLoading.count() > 0) {
+      await expect(searchLoading).toHaveCount(0)
+    }
+
+    await expect(targetNote).toBeVisible({ timeout: 5_000 })
+  }
+
+  await targetNote.click()
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
 }
 

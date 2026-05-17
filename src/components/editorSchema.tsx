@@ -8,12 +8,14 @@ import { createReactBlockSpec, createReactInlineContentSpec } from '@blocknote/r
 import { lazy, Suspense } from 'react'
 import { resolveWikilinkColor as resolveColor } from '../utils/wikilinkColors'
 import { resolveEntry } from '../utils/wikilink'
+import { EMBEDDED_NOTE_BLOCK_TYPE } from '../utils/embeddedNoteMarkdown'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
 import { TASKS_BLOCK_TYPE, tasksFenceSource } from '../utils/tasksMarkdown'
 import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
 import type { VaultEntry } from '../types'
 import { createTolariaCodeBlockOptions } from './codeBlockOptions'
+import { EmbeddedNoteBlock } from './EmbeddedNoteBlock'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
 import { SafeHtmlSpan } from './SafeMarkup'
@@ -116,6 +118,25 @@ const MathBlock = createReactBlockSpec(
       <div className="math-block-shell">
         <MathRender latex={props.block.props.latex} displayMode />
       </div>
+    ),
+  },
+)
+
+const EmbeddedNote = createReactBlockSpec(
+  {
+    type: EMBEDDED_NOTE_BLOCK_TYPE,
+    propSchema: {
+      source: { default: '' },
+      target: { default: '' },
+    },
+    content: 'none',
+  },
+  {
+    render: (props) => (
+      <EmbeddedNoteBlock
+        source={props.block.props.source}
+        target={props.block.props.target}
+      />
     ),
   },
 )
@@ -251,6 +272,7 @@ const TldrawBlock = createReactBlockSpec(
 
 const codeBlock = createCodeBlockSpec(createTolariaCodeBlockOptions())
 const mathBlock = MathBlock()
+const embeddedNoteBlock = EmbeddedNote()
 const mermaidBlock = MermaidBlock()
 const tasksBlock = TasksBlock()
 const tldrawBlock = TldrawBlock()
@@ -264,6 +286,7 @@ export const schema = BlockNoteSchema.create({
 }).extend({
   blockSpecs: {
     mathBlock,
+    embeddedNoteBlock,
     mermaidBlock,
     tasksBlock,
     tldrawBlock,

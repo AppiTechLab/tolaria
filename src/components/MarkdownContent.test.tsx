@@ -79,6 +79,7 @@ describe('MarkdownContent', () => {
       expect(preprocessWikilinks('See [[My Note]]')).toBe('See [My Note](wikilink://My%20Note)')
       expect(preprocessWikilinks('[[A]] and [[B]]')).toBe('[A](wikilink://A) and [B](wikilink://B)')
       expect(preprocessWikilinks('`[[code]]`')).toBe('`[[code]]`')
+      expect(preprocessWikilinks('![[Embedded Note]]')).toBe('![[Embedded Note]]')
     })
 
     it('renders [[Note Title]] as a clickable wikilink chip', () => {
@@ -158,6 +159,16 @@ describe('MarkdownContent', () => {
       )
       expect(container.querySelector('.chat-wikilink')).toBeNull()
       expect(container.textContent).toContain('[[Some Note]]')
+    })
+
+    it('does not transform embedded note syntax into a wikilink chip', () => {
+      const onClick = vi.fn()
+      const { container } = render(
+        <MarkdownContent content="See ![[Embedded Note]]" onWikilinkClick={onClick} />,
+      )
+
+      expect(container.querySelector('.chat-wikilink')).toBeNull()
+      expect(container.textContent).toContain('![[Embedded Note]]')
     })
 
     it('renders wikilinks inside list items', () => {

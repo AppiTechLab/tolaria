@@ -516,6 +516,8 @@
   "editor.imageLightbox.title": "Image preview",
   "editor.filename.rename": "Rename filename",
   "editor.filename.renameToTitle": "Rename the file to match the title",
+  "editor.embed.unavailable": "Embedded note unavailable",
+  "editor.embed.empty": "This note has no body content to embed.",
   "editor.filename.trigger": "Filename {filename}. Press Enter to rename",
   "editor.banner.archived": "Archived",
   "editor.banner.unarchive": "Unarchive",
