@@ -42,30 +42,35 @@ const LAB_HOME_SECTION_ITEMS: Array<{
   key: ResearchLabDomainKey
   labelKey: string
   icon: typeof FolderSimple
+  color: string
 }> = [
   {
     id: 'ongoing-projects',
     key: 'ongoingProjects',
     labelKey: 'labHome.section.ongoingProjects.title',
     icon: FolderSimple,
+    color: 'var(--accent-red)',
   },
   {
     id: 'project-acquisition',
     key: 'projectAcquisition',
     labelKey: 'labHome.section.projectAcquisition.title',
     icon: Target,
+    color: 'var(--accent-orange)',
   },
   {
     id: 'teaching',
     key: 'teaching',
     labelKey: 'labHome.section.teaching.title',
     icon: GraduationCap,
+    color: 'var(--accent-blue)',
   },
   {
     id: 'lab-management',
     key: 'labManagement',
     labelKey: 'labHome.section.labManagement.title',
     icon: Buildings,
+    color: 'var(--accent-teal)',
   },
 ]
 
@@ -226,6 +231,7 @@ export function ResearchLabHomeSection({
                   isActive={isSelectionActive(selection, target)}
                   onClick={() => onSelect(target)}
                   compact
+                  style={{ color: item.color }}
                 />
               </div>
             )

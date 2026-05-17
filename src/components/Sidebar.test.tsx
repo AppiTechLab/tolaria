@@ -1025,6 +1025,15 @@ describe('Sidebar', () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: 'folder', path: 'Teaching', rootPath: '/vault' })
   })
 
+  it('applies a distinct accent color to each Lab Home child entry', () => {
+    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} researchLabMode={researchLabMode} vaultRootPath="/vault" />)
+
+    expect(screen.getByText('Ongoing Projects').closest('[class*="cursor-pointer"]')).toHaveStyle({ color: 'var(--accent-red)' })
+    expect(screen.getByText('Project Acquisition').closest('[class*="cursor-pointer"]')).toHaveStyle({ color: 'var(--accent-orange)' })
+    expect(screen.getByText('Teaching').closest('[class*="cursor-pointer"]')).toHaveStyle({ color: 'var(--accent-blue)' })
+    expect(screen.getByText('Lab Management').closest('[class*="cursor-pointer"]')).toHaveStyle({ color: 'var(--accent-teal)' })
+  })
+
   it('preserves the default top nav when research lab mode is disabled', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} showInbox inboxCount={3} />)
 

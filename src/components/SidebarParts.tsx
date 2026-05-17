@@ -170,6 +170,7 @@ function DisabledNavItem({
   compact,
   disabledTooltip,
   padding,
+  style,
 }: {
   Icon: ComponentType<IconProps>
   emoji?: string | null
@@ -177,9 +178,10 @@ function DisabledNavItem({
   compact?: boolean
   disabledTooltip?: string
   padding: ReturnType<typeof getNavItemPadding>
+  style?: React.CSSProperties
 }) {
   return (
-    <div className="flex select-none items-center gap-2 rounded text-foreground" style={{ padding, borderRadius: 4, opacity: 0.4, cursor: 'not-allowed' }} title={disabledTooltip ?? "Coming soon"}>
+    <div className="flex select-none items-center gap-2 rounded text-foreground" style={{ padding, borderRadius: 4, opacity: 0.4, cursor: 'not-allowed', ...style }} title={disabledTooltip ?? "Coming soon"}>
       <SidebarNavIcon Icon={Icon} emoji={emoji} iconSize={getNavItemIconSize(compact)} />
       <NavItemLabel label={label} compact={compact} />
     </div>
@@ -201,6 +203,7 @@ function ClickableNavItem({
   onClick,
   compact,
   padding,
+  style,
 }: {
   Icon: ComponentType<IconProps>
   emoji?: string | null
@@ -216,11 +219,12 @@ function ClickableNavItem({
   onClick?: () => void
   compact?: boolean
   padding: ReturnType<typeof getNavItemPadding>
+  style?: React.CSSProperties
 }) {
   return (
     <div
       className={cn("flex cursor-pointer select-none items-center gap-2 rounded transition-colors", isActive ? activeClassName : "text-foreground hover:bg-accent")}
-      style={{ padding, borderRadius: 4 }}
+      style={{ padding, borderRadius: 4, ...style }}
       onClick={onClick}
     >
       <SidebarNavIcon Icon={Icon} emoji={emoji} iconSize={getNavItemIconSize(compact)} isActive={isActive} />
@@ -236,7 +240,7 @@ function ClickableNavItem({
   )
 }
 
-export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActive, activeClassName = 'bg-primary/10 text-primary', badgeClassName, badgeStyle, activeBadgeClassName, activeBadgeStyle, onClick, disabled, disabledTooltip, compact }: {
+export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActive, activeClassName = 'bg-primary/10 text-primary', badgeClassName, badgeStyle, activeBadgeClassName, activeBadgeStyle, onClick, disabled, disabledTooltip, compact, style }: {
   icon: ComponentType<IconProps>
   emoji?: string | null
   label: string
@@ -252,6 +256,7 @@ export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActiv
   disabled?: boolean
   disabledTooltip?: string
   compact?: boolean
+  style?: React.CSSProperties
 }) {
   const padding = getNavItemPadding(compact, countLoading || hasSidebarCount(count))
   if (disabled) {
@@ -263,6 +268,7 @@ export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActiv
         compact={compact}
         disabledTooltip={disabledTooltip}
         padding={padding}
+        style={style}
       />
     )
   }
@@ -283,6 +289,7 @@ export function NavItem({ icon: Icon, emoji, label, count, countLoading, isActiv
       onClick={onClick}
       compact={compact}
       padding={padding}
+      style={style}
     />
   )
 }
