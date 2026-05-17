@@ -459,6 +459,40 @@ function render(ui: ReactElement, options?: Parameters<typeof testingLibraryRend
   })
 }
 
+async function openAllNotesFromSidebar() {
+  const topNav = await screen.findByTestId('sidebar-top-nav')
+  await act(async () => {
+    fireEvent.click(within(topNav).getByText('All Notes'))
+    await Promise.resolve()
+  })
+}
+
+async function getNoteListRow(path: string) {
+  return await waitFor(() => {
+    const noteList = screen.getByTestId('note-list-container')
+    const row = noteList.querySelector<HTMLElement>(`[data-note-path="${path}"]`)
+    expect(row).toBeTruthy()
+    return row as HTMLElement
+  })
+}
+
+async function clickNoteListRow(path: string) {
+  const row = await getNoteListRow(path)
+  await act(async () => {
+    fireEvent.click(row)
+    await Promise.resolve()
+  })
+}
+
+async function getEditorTabRow(path: string) {
+  return await waitFor(() => {
+    const tabBar = screen.getByTestId('editor-tab-bar')
+    const row = tabBar.querySelector<HTMLElement>(`[data-note-path="${path}"]`)
+    expect(row).toBeTruthy()
+    return row as HTMLElement
+  })
+}
+
 function createMockUpdaterResult(
   checkForUpdates: () => Promise<{ kind: 'up-to-date' } | { kind: 'available'; version: string; displayVersion: string } | { kind: 'error'; message: string }> = async () => ({ kind: 'up-to-date' }),
 ) {
@@ -521,18 +555,64 @@ describe('App', () => {
 
   it('loads and displays vault entries in sidebar', async () => {
     render(<App />)
-    const topNav = await screen.findByTestId('sidebar-top-nav')
-
-    await act(async () => {
-      fireEvent.click(within(topNav).getByText('All Notes'))
-      await Promise.resolve()
-    })
+    await openAllNotesFromSidebar()
 
     await waitFor(() => {
       // Entries appear in the note list once Lab Home opens All Notes.
       expect(screen.getAllByText('Test Project').length).toBeGreaterThan(0)
       expect(screen.getAllByText('Software Development').length).toBeGreaterThan(0)
     })
+  })
+
+  it('opens multiple notes into tabs and focuses existing tabs from the note list', async () => {
+    render(<App />)
+    await openAllNotesFromSidebar()
+
+    await clickNoteListRow('/vault/project/test.md')
+    await waitFor(() => expect(window.__laputaTest?.activeTabPath).toBe('/vault/project/test.md'))
+
+    await clickNoteListRow('/vault/topic/dev.md')
+    await waitFor(() => expect(window.__laputaTest?.activeTabPath).toBe('/vault/topic/dev.md'))
+
+    let tabBar = screen.getByTestId('editor-tab-bar')
+    expect(within(tabBar).getAllByRole('tab')).toHaveLength(2)
+
+    await act(async () => {
+      fireEvent.click(within(tabBar).getByRole('tab', { name: 'Test Project' }))
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(window.__laputaTest?.activeTabPath).toBe('/vault/project/test.md'))
+
+    await clickNoteListRow('/vault/topic/dev.md')
+    await waitFor(() => expect(window.__laputaTest?.activeTabPath).toBe('/vault/topic/dev.md'))
+
+    tabBar = screen.getByTestId('editor-tab-bar')
+    expect(within(tabBar).getAllByRole('tab')).toHaveLength(2)
+  })
+
+  it('closes tabs back to the previous note and then the empty editor state', async () => {
+    render(<App />)
+    await openAllNotesFromSidebar()
+
+    await clickNoteListRow('/vault/project/test.md')
+    await clickNoteListRow('/vault/topic/dev.md')
+    await waitFor(() => expect(window.__laputaTest?.activeTabPath).toBe('/vault/topic/dev.md'))
+
+    const devTab = await getEditorTabRow('/vault/topic/dev.md')
+    await act(async () => {
+      fireEvent.click(within(devTab).getByRole('button', { name: 'Software Development' }))
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(window.__laputaTest?.activeTabPath).toBe('/vault/project/test.md'))
+
+    const projectTab = await getEditorTabRow('/vault/project/test.md')
+    await act(async () => {
+      fireEvent.click(within(projectTab).getByRole('button', { name: 'Test Project' }))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => expect(screen.getByText('Select a note to start editing')).toBeInTheDocument())
+    expect(screen.queryByTestId('editor-tab-bar')).not.toBeInTheDocument()
   })
 
   it('keeps the app shell usable while the vault note scan is pending', async () => {

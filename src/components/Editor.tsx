@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, memo, useState } from 'react'
+import { X } from 'lucide-react'
 import { useEditorTabSwap } from '../hooks/useEditorTabSwap'
 import { useCreateBlockNote } from '@blocknote/react'
 import '@blocknote/mantine/style.css'
@@ -36,6 +37,8 @@ import { createImeCompositionKeyGuardExtension } from './imeCompositionKeyGuardE
 import { createMathInputExtension } from './mathInputExtension'
 import { createRichEditorTransformErrorRecoveryExtension } from './richEditorTransformErrorRecoveryExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
+import { Button } from './ui/button'
+import { notePathsMatch } from '../utils/notePathIdentity'
 import './Editor.css'
 import './EditorTheme.css'
 
@@ -92,6 +95,8 @@ interface EditorProps {
   onUnarchiveNote?: (path: string) => void
   onContentChange?: (path: string, content: string) => void
   onSave?: () => void
+  onSwitchTab?: (path: string) => void
+  onCloseTab?: (path: string) => void
   /** Called when the user explicitly renames the filename from the breadcrumb. */
   onRenameFilename?: (path: string, newFilenameStem: string) => void
   noteWidth?: NoteWidthMode
@@ -176,6 +181,82 @@ function EditorEmptyState({ locale = 'en' }: { locale?: AppLocale }) {
       <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
         <p className="m-0 text-[15px]">{translate(locale, 'editor.empty.selectNote')}</p>
         <span className="text-xs text-muted-foreground">{translate(locale, 'editor.empty.shortcuts', { quickOpen: quickOpenShortcut, newNote: newNoteShortcut })}</span>
+      </div>
+    </div>
+  )
+}
+
+function resolveTabLabel(entry: VaultEntry): string {
+  const title = typeof entry.title === 'string' ? entry.title.trim() : ''
+  if (title) return title
+
+  const filename = typeof entry.filename === 'string' ? entry.filename.trim() : ''
+  if (filename) return filename
+
+  const pathSegments = entry.path.split('/')
+  return pathSegments[pathSegments.length - 1] || entry.path
+}
+
+function EditorTabBar({
+  tabs,
+  activeTabPath,
+  onSwitchTab,
+  onCloseTab,
+}: {
+  tabs: Tab[]
+  activeTabPath: string | null
+  onSwitchTab?: (path: string) => void
+  onCloseTab?: (path: string) => void
+}) {
+  if (tabs.length === 0) return null
+
+  return (
+    <div data-testid="editor-tab-bar" className="border-b border-border bg-muted/30 px-2 pt-2">
+      <div className="flex gap-1 overflow-x-auto pb-2" role="tablist">
+        {tabs.map((tab) => {
+          const isActive = notePathsMatch(tab.entry.path, activeTabPath)
+          const label = resolveTabLabel(tab.entry)
+
+          return (
+            <div
+              key={tab.entry.path}
+              data-note-path={tab.entry.path}
+              className={[
+                'flex min-w-0 shrink-0 items-center rounded-md border',
+                isActive
+                  ? 'border-border bg-background text-foreground shadow-sm'
+                  : 'border-transparent bg-transparent text-muted-foreground hover:border-border/60 hover:bg-background/70 hover:text-foreground',
+              ].join(' ')}
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                role="tab"
+                aria-selected={isActive}
+                title={label}
+                className="h-8 min-w-0 rounded-r-none border-0 px-3"
+                onClick={() => onSwitchTab?.(tab.entry.path)}
+              >
+                <span className="max-w-[14rem] truncate">{label}</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                title={label}
+                aria-label={label}
+                className="mr-1 text-muted-foreground hover:text-foreground"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  onCloseTab?.(tab.entry.path)
+                }}
+              >
+                <X className="size-3" />
+              </Button>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -334,6 +415,8 @@ function EditorLayout({
   handleToggleRawExclusive,
   onContentChange,
   onSave,
+  onSwitchTab,
+  onCloseTab,
   activeStatus,
   showDiffToggle,
   showAIChat,
@@ -405,6 +488,8 @@ function EditorLayout({
   handleToggleRawExclusive: () => void
   onContentChange?: (path: string, content: string) => void
   onSave?: () => void
+  onSwitchTab?: (path: string) => void
+  onCloseTab?: (path: string) => void
   activeStatus: NoteStatus
   showDiffToggle: boolean
   showAIChat?: boolean
@@ -466,6 +551,12 @@ function EditorLayout({
 
   return (
     <div className="editor flex flex-col min-h-0 overflow-hidden bg-background text-foreground">
+      <EditorTabBar
+        tabs={tabs}
+        activeTabPath={activeTabPath}
+        onSwitchTab={onSwitchTab}
+        onCloseTab={onCloseTab}
+      />
       <div className="flex flex-1 min-h-0">
         {showEmptyState
           ? <EditorEmptyState locale={locale} />

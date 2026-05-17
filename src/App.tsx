@@ -82,6 +82,7 @@ import { UpdateBanner } from './components/UpdateBanner'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from './mock-tauri'
 import type { SidebarSelection, InboxPeriod, ModifiedFile, VaultEntry, ViewDefinition, ViewFile, WorkspaceIdentity } from './types'
+import type { Tab as EditorTab } from './hooks/useTabManagement'
 import type { NoteListItem } from './utils/ai-context'
 import { initializeNoteProperties } from './utils/initializeNoteProperties'
 import { filterEntries, filterInboxEntries, type NoteListFilter } from './utils/noteListHelpers'
@@ -692,9 +693,9 @@ function App() {
   // Keep note entry in sync with vault entries so banners (trash/archive)
   // and read-only state react immediately without reopening the note.
   useEffect(() => {
-    notes.setTabs(prev => {
+    notes.setTabs((prev: EditorTab[]) => {
       let changed = false
-      const next = prev.map(tab => {
+      const next = prev.map((tab: EditorTab) => {
         const fresh = visibleEntries.find(e => e.path === tab.entry.path)
         if (fresh && fresh !== tab.entry) {
           changed = true
@@ -771,7 +772,7 @@ function App() {
         entry.path,
         workspace,
         sourceVaultPath,
-        (oldPath, newEntry) => {
+        (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, _newContent: string) => {
           appSave.trackRenamedPath(oldPath, newEntry.path)
           vault.replaceEntry(oldPath, newEntry)
           if (effectiveSelection.kind === 'entity' && effectiveSelection.entry.path === oldPath) {
@@ -902,7 +903,7 @@ function App() {
   }, [notes.activeTabPath, handleRemoveNoteIcon])
 
   const handleOpenInNewWindow = useCallback(() => {
-    const activeTab = notes.tabs.find(t => t.entry.path === notes.activeTabPath)
+    const activeTab = notes.tabs.find((tab: EditorTab) => tab.entry.path === notes.activeTabPath)
     if (activeTab) {
       openNoteInNewWindow(
         activeTab.entry.path,
@@ -1026,7 +1027,7 @@ function App() {
     }
     const result = await handleAppSave(...args)
     const activeTab = notes.activeTabPath
-      ? notes.tabs.find((tab) => tab.entry.path === notes.activeTabPath)
+      ? notes.tabs.find((tab: EditorTab) => tab.entry.path === notes.activeTabPath)
       : null
     if (activeTab) {
       await loadModifiedFilesForRepository(vaultPathForEntry(activeTab.entry, resolvedPath), {
@@ -1052,7 +1053,7 @@ function App() {
 
     const activePath = notes.activeTabPath
     const activeTab = activePath
-      ? notes.tabs.find((tab) => tab.entry.path === activePath)
+      ? notes.tabs.find((tab: EditorTab) => tab.entry.path === activePath)
       : null
 
     if (!activePath || !activeTab) {
@@ -1363,7 +1364,7 @@ function App() {
 
   const activeCommandEntry = useMemo(() => {
     if (!notes.activeTabPath) return null
-    return notes.tabs.find((tab) => tab.entry.path === notes.activeTabPath)?.entry
+    return notes.tabs.find((tab: EditorTab) => tab.entry.path === notes.activeTabPath)?.entry
       ?? vault.entries.find((entry) => entry.path === notes.activeTabPath)
       ?? null
   }, [notes.activeTabPath, notes.tabs, vault.entries])
@@ -1662,6 +1663,7 @@ function App() {
 
   const noteListModifiedFiles = isChangesSelection ? selectedChangesModifiedFiles : undefined
   const noteListModifiedFilesError = isChangesSelection ? gitSurfaces.changesModifiedFilesError : null
+  const noteListOpenNote = isChangesSelection ? handleReplaceActiveTabWithQueuedDiff : notes.handleSelectNote
 
   return (
     <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat}>
@@ -1687,7 +1689,7 @@ function App() {
                     <LabHomeView locale={appLocale} />
                   )
                 ) : (
-                  <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!sidebarVisible} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={handleReplaceActiveTabWithQueuedDiff} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
+                  <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!sidebarVisible} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={noteListOpenNote} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
                 )}
               </div>
               <ResizeHandle onResize={layout.handleNoteListResize} />
@@ -1742,6 +1744,8 @@ function App() {
               onUnarchiveNote={activeDeletedFile ? undefined : entryActions.handleUnarchiveNote}
               onContentChange={handleTrackedContentChange}
               onSave={handleTrackedSave}
+              onSwitchTab={notes.handleSwitchTab}
+              onCloseTab={notes.handleCloseTab}
               onRenameFilename={activeDeletedFile ? undefined : appSave.handleFilenameRename}
               noteWidth={activeNoteWidth}
               onToggleNoteWidth={handleToggleNoteWidth}

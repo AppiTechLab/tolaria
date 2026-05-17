@@ -102,6 +102,10 @@ function expectSingleActiveTab(result: HookState, path: string) {
   expect(result.current.activeTabPath).toBe(path)
 }
 
+function expectOpenTabPaths(result: HookState, paths: string[]) {
+  expect(result.current.tabs.map((tab) => tab.entry.path)).toEqual(paths)
+}
+
 function createDeferred<T>() {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((res) => {
@@ -132,7 +136,7 @@ function seedCacheBeyondByteLimit() {
   }
 }
 
-describe('useTabManagement (single-note model)', () => {
+describe('useTabManagement (multi-tab model)', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     clearPrefetchCache()
@@ -233,11 +237,12 @@ describe('useTabManagement (single-note model)', () => {
       expect(result.current.activeTabPath).toBeNull()
     })
 
-    it('replaces the current note when selecting a different one', async () => {
+    it('keeps the current note open when selecting a different one', async () => {
       const { result } = renderHook(() => useTabManagement())
       await selectNote(result, { path: '/vault/a.md', title: 'A' })
       await selectNote(result, { path: '/vault/b.md', title: 'B' })
-      expectSingleActiveTab(result, '/vault/b.md')
+      expectOpenTabPaths(result, ['/vault/a.md', '/vault/b.md'])
+      expect(result.current.activeTabPath).toBe('/vault/b.md')
     })
 
     it('keeps a dirty already-open note in place when selecting it again', async () => {
@@ -612,6 +617,24 @@ describe('useTabManagement (single-note model)', () => {
       expect(result.current.tabs).toHaveLength(0)
       expect(result.current.activeTabPath).toBeNull()
     })
+
+    it('activates the most recently used remaining tab when the active tab closes', async () => {
+      const { result } = renderHook(() => useTabManagement())
+      await selectNote(result, { path: '/vault/a.md', title: 'A' })
+      await selectNote(result, { path: '/vault/b.md', title: 'B' })
+      await selectNote(result, { path: '/vault/c.md', title: 'C' })
+
+      act(() => {
+        result.current.handleSwitchTab('/vault/b.md')
+      })
+
+      act(() => {
+        result.current.handleCloseTab('/vault/b.md')
+      })
+
+      expectOpenTabPaths(result, ['/vault/a.md', '/vault/c.md'])
+      expect(result.current.activeTabPath).toBe('/vault/c.md')
+    })
   })
 
   describe('content prefetch cache', () => {
@@ -961,8 +984,8 @@ describe('useTabManagement (single-note model)', () => {
       await selectNote(result, { path: '/vault/other.md', title: 'Other' })
       await selectNote(result, { path: '/vault/note/missing-cached.md', title: 'Missing cached' })
 
-      expect(result.current.tabs).toEqual([])
-      expect(result.current.activeTabPath).toBeNull()
+      expectOpenTabPaths(result, ['/vault/other.md'])
+      expect(result.current.activeTabPath).toBe('/vault/other.md')
       expect(onMissingNotePath).toHaveBeenCalledWith(
         expect.objectContaining({ path: '/vault/note/missing-cached.md', title: 'Missing cached' }),
         expect.any(Error),

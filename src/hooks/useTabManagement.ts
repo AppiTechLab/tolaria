@@ -52,6 +52,20 @@ export function clearPrefetchCache(): void {
 
 export type { Tab }
 
+interface TabManagementResult {
+  tabs: Tab[]
+  setTabs: React.Dispatch<React.SetStateAction<Tab[]>>
+  activeTabPath: string | null
+  activeTabPathRef: React.MutableRefObject<string | null>
+  requestedActiveTabPathRef: React.MutableRefObject<string | null>
+  handleSelectNote: (entry: VaultEntry) => Promise<void>
+  openTabWithContent: (entry: VaultEntry, content: string) => void
+  handleSwitchTab: (path: string) => void
+  handleCloseTab: (path: string) => void
+  handleReplaceActiveTab: (entry: VaultEntry) => Promise<void>
+  closeAllTabs: () => void
+}
+
 interface TabManagementOptions {
   beforeNavigate?: (fromPath: string, toPath: string) => Promise<void>
   hasUnsavedChanges?: (path: string) => boolean
@@ -64,12 +78,16 @@ interface NavigateToEntryOptions {
   entry: VaultEntry
   sourceEntry?: VaultEntry
   forceReload?: boolean
-  navSeqRef: React.MutableRefObject<number>
+  replaceFromPath?: string | null
+  hasUnsavedChanges?: (path: string) => boolean
+  loadSeqRef: React.MutableRefObject<number>
+  pendingOpenPathsRef: React.MutableRefObject<Set<string>>
+  latestLoadSeqByPathRef: React.MutableRefObject<Map<string, number>>
   tabsRef: React.MutableRefObject<Tab[]>
+  tabHistoryRef: React.MutableRefObject<string[]>
   activeTabPathRef: React.MutableRefObject<string | null>
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>
   setActiveTabPath: React.Dispatch<React.SetStateAction<string | null>>
-  hasUnsavedChanges?: (path: string) => boolean
   onMissingActiveVault?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onMissingNotePath?: (entry: VaultEntry, error: unknown) => void | Promise<void>
   onUnreadableNoteContent?: (entry: VaultEntry, error: unknown) => void | Promise<void>
@@ -84,6 +102,30 @@ function syncActiveTabPath(
   setActiveTabPath(path)
 }
 
+function rememberTabAccess(
+  tabHistoryRef: React.MutableRefObject<string[]>,
+  path: string,
+) {
+  tabHistoryRef.current = [...tabHistoryRef.current.filter((candidate) => !notePathsMatch(candidate, path)), path]
+}
+
+function forgetTabAccess(
+  tabHistoryRef: React.MutableRefObject<string[]>,
+  path: string,
+) {
+  tabHistoryRef.current = tabHistoryRef.current.filter((candidate) => !notePathsMatch(candidate, path))
+}
+
+function syncActiveTabSelection(
+  activeTabPathRef: React.MutableRefObject<string | null>,
+  setActiveTabPath: React.Dispatch<React.SetStateAction<string | null>>,
+  tabHistoryRef: React.MutableRefObject<string[]>,
+  path: string | null,
+) {
+  syncActiveTabPath(activeTabPathRef, setActiveTabPath, path)
+  if (path) rememberTabAccess(tabHistoryRef, path)
+}
+
 function resetRequestedPathIfStillPending(
   requestedActiveTabPathRef: React.MutableRefObject<string | null>,
   activeTabPathRef: React.MutableRefObject<string | null>,
@@ -94,21 +136,90 @@ function resetRequestedPathIfStillPending(
   }
 }
 
-function setSingleTab(
+function syncTabsState(
   tabsRef: React.MutableRefObject<Tab[]>,
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>,
-  nextTab: Tab,
+  nextTabs: Tab[],
 ) {
-  tabsRef.current = [nextTab]
-  setTabs([nextTab])
+  tabsRef.current = nextTabs
+  setTabs(nextTabs)
+}
+
+function applyTabsState(
+  tabsRef: React.MutableRefObject<Tab[]>,
+  setTabs: React.Dispatch<React.SetStateAction<Tab[]>>,
+  update: (currentTabs: Tab[]) => Tab[],
+) {
+  const nextTabs = update(tabsRef.current)
+  syncTabsState(tabsRef, setTabs, nextTabs)
+  return nextTabs
 }
 
 function clearTabs(
   tabsRef: React.MutableRefObject<Tab[]>,
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>,
 ) {
-  tabsRef.current = []
-  setTabs([])
+  syncTabsState(tabsRef, setTabs, [])
+}
+
+function findMatchingTab(tabs: Tab[], path: string): Tab | undefined {
+  return tabs.find((tab) => notePathsMatch(tab.entry.path, path))
+}
+
+function findMatchingTabPath(tabs: Tab[], path: string): string | null {
+  return findMatchingTab(tabs, path)?.entry.path ?? null
+}
+
+function upsertTab(
+  tabsRef: React.MutableRefObject<Tab[]>,
+  setTabs: React.Dispatch<React.SetStateAction<Tab[]>>,
+  nextTab: Tab,
+  replaceFromPath?: string | null,
+) {
+  return applyTabsState(tabsRef, setTabs, (currentTabs) => {
+    const filteredTabs = replaceFromPath
+      ? currentTabs.filter((tab) => !notePathsMatch(tab.entry.path, replaceFromPath) || notePathsMatch(tab.entry.path, nextTab.entry.path))
+      : currentTabs
+    const existingIndex = filteredTabs.findIndex((tab) => notePathsMatch(tab.entry.path, nextTab.entry.path))
+
+    if (existingIndex >= 0) {
+      const updatedTabs = [...filteredTabs]
+      updatedTabs[existingIndex] = nextTab
+      return updatedTabs
+    }
+
+    return [...filteredTabs, nextTab]
+  })
+}
+
+function removeTab(
+  tabsRef: React.MutableRefObject<Tab[]>,
+  setTabs: React.Dispatch<React.SetStateAction<Tab[]>>,
+  path: string,
+) {
+  return applyTabsState(tabsRef, setTabs, (currentTabs) => currentTabs.filter((tab) => !notePathsMatch(tab.entry.path, path)))
+}
+
+function resolveFallbackActivePath(options: {
+  tabsRef: React.MutableRefObject<Tab[]>
+  tabHistoryRef: React.MutableRefObject<string[]>
+  preferredPath?: string | null
+}) {
+  const { tabsRef, tabHistoryRef, preferredPath } = options
+
+  if (preferredPath) {
+    const preferredTab = findMatchingTab(tabsRef.current, preferredPath)
+    if (preferredTab) return preferredTab.entry.path
+  }
+
+  for (let index = tabHistoryRef.current.length - 1; index >= 0; index -= 1) {
+    const candidate = tabHistoryRef.current[index]
+    const candidateTab = findMatchingTab(tabsRef.current, candidate)
+    if (candidateTab) return candidateTab.entry.path
+  }
+
+  const lastTab = tabsRef.current[tabsRef.current.length - 1]
+  return lastTab?.entry.path ?? null
 }
 
 function normalizeOpenEntry(entry: VaultEntry): VaultEntry | null {
@@ -132,47 +243,67 @@ function isAlreadyViewingPath(
 
 function startEntryNavigation(options: {
   entry: VaultEntry
-  navSeqRef: React.MutableRefObject<number>
+  loadSeqRef: React.MutableRefObject<number>
+  pendingOpenPathsRef: React.MutableRefObject<Set<string>>
+  latestLoadSeqByPathRef: React.MutableRefObject<Map<string, number>>
   activeTabPathRef: React.MutableRefObject<string | null>
+  tabHistoryRef: React.MutableRefObject<string[]>
   setActiveTabPath: React.Dispatch<React.SetStateAction<string | null>>
 }) {
   const {
     entry,
-    navSeqRef,
+    loadSeqRef,
+    pendingOpenPathsRef,
+    latestLoadSeqByPathRef,
     activeTabPathRef,
+    tabHistoryRef,
     setActiveTabPath,
   } = options
 
-  const seq = ++navSeqRef.current
+  const previousActivePath = activeTabPathRef.current
+  const seq = ++loadSeqRef.current
+  latestLoadSeqByPathRef.current.set(entry.path, seq)
+  pendingOpenPathsRef.current.add(entry.path)
+
   const cachedEntry = getCachedNoteContentEntry(entry.path)
-  syncActiveTabPath(activeTabPathRef, setActiveTabPath, entry.path)
+  syncActiveTabSelection(activeTabPathRef, setActiveTabPath, tabHistoryRef, entry.path)
   if (hasResolvedCachedContent(cachedEntry)) {
     markNoteOpenTrace(entry.path, 'cacheReady')
   }
 
-  return { seq, cachedEntry }
+  return { seq, cachedEntry, previousActivePath }
 }
 
 function openBinaryEntry(options: {
   entry: VaultEntry
-  navSeqRef: React.MutableRefObject<number>
+  replaceFromPath?: string | null
+  pendingOpenPathsRef: React.MutableRefObject<Set<string>>
+  latestLoadSeqByPathRef: React.MutableRefObject<Map<string, number>>
   tabsRef: React.MutableRefObject<Tab[]>
+  tabHistoryRef: React.MutableRefObject<string[]>
   activeTabPathRef: React.MutableRefObject<string | null>
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>
   setActiveTabPath: React.Dispatch<React.SetStateAction<string | null>>
 }) {
   const {
     entry,
-    navSeqRef,
+    replaceFromPath,
+    pendingOpenPathsRef,
+    latestLoadSeqByPathRef,
     tabsRef,
+    tabHistoryRef,
     activeTabPathRef,
     setTabs,
     setActiveTabPath,
   } = options
 
-  navSeqRef.current += 1
-  syncActiveTabPath(activeTabPathRef, setActiveTabPath, entry.path)
-  setSingleTab(tabsRef, setTabs, { entry, content: '' })
+  pendingOpenPathsRef.current.delete(entry.path)
+  latestLoadSeqByPathRef.current.delete(entry.path)
+  if (replaceFromPath && !notePathsMatch(replaceFromPath, entry.path)) {
+    forgetTabAccess(tabHistoryRef, replaceFromPath)
+  }
+  upsertTab(tabsRef, setTabs, { entry, content: '' }, replaceFromPath)
+  syncActiveTabSelection(activeTabPathRef, setActiveTabPath, tabHistoryRef, entry.path)
   finishNoteOpenTrace(entry.path)
 }
 
@@ -187,28 +318,21 @@ function isMissingNotePathError(error: unknown): boolean {
 
 function shouldApplyLoadedEntry(options: {
   seq: number
-  navSeqRef: React.MutableRefObject<number>
-  content: string
-  forceReload: boolean
-  activeTabPathRef: React.MutableRefObject<string | null>
-  tabsRef: React.MutableRefObject<Tab[]>
   path: string
+  latestLoadSeqByPathRef: React.MutableRefObject<Map<string, number>>
+  pendingOpenPathsRef: React.MutableRefObject<Set<string>>
+  tabsRef: React.MutableRefObject<Tab[]>
 }) {
   const {
     seq,
-    navSeqRef,
-    content,
-    forceReload,
-    activeTabPathRef,
-    tabsRef,
     path,
+    latestLoadSeqByPathRef,
+    pendingOpenPathsRef,
+    tabsRef,
   } = options
 
-  if (navSeqRef.current !== seq) return false
-  if (forceReload) return true
-  if (!notePathsMatch(activeTabPathRef.current, path)) return true
-  const openTab = tabsRef.current.find((tab) => notePathsMatch(tab.entry.path, path))
-  return !openTab || openTab.content !== content
+  if (latestLoadSeqByPathRef.current.get(path) !== seq) return false
+  return pendingOpenPathsRef.current.has(path) || !!findMatchingTab(tabsRef.current, path)
 }
 
 type EntryLoadFailureKind =
@@ -227,14 +351,42 @@ function getEntryLoadFailureKind(error: unknown): EntryLoadFailureKind {
 }
 
 function resetFailedEntrySelection(options: {
+  failedPath: string
+  previousActivePath: string | null
+  pendingOpenPathsRef: React.MutableRefObject<Set<string>>
+  tabHistoryRef: React.MutableRefObject<string[]>
+  latestLoadSeqByPathRef: React.MutableRefObject<Map<string, number>>
   tabsRef: React.MutableRefObject<Tab[]>
   activeTabPathRef: React.MutableRefObject<string | null>
-  setTabs: React.Dispatch<React.SetStateAction<Tab[]>>
   setActiveTabPath: React.Dispatch<React.SetStateAction<string | null>>
 }) {
-  const { tabsRef, activeTabPathRef, setTabs, setActiveTabPath } = options
-  clearTabs(tabsRef, setTabs)
-  syncActiveTabPath(activeTabPathRef, setActiveTabPath, null)
+  const {
+    failedPath,
+    previousActivePath,
+    pendingOpenPathsRef,
+    tabHistoryRef,
+    latestLoadSeqByPathRef,
+    tabsRef,
+    activeTabPathRef,
+    setActiveTabPath,
+  } = options
+
+  pendingOpenPathsRef.current.delete(failedPath)
+  latestLoadSeqByPathRef.current.delete(failedPath)
+
+  const openFailedTab = findMatchingTab(tabsRef.current, failedPath)
+  if (!openFailedTab) {
+    forgetTabAccess(tabHistoryRef, failedPath)
+  }
+
+  if (!notePathsMatch(activeTabPathRef.current, failedPath)) return
+
+  const fallbackPath = openFailedTab?.entry.path ?? resolveFallbackActivePath({
+    tabsRef,
+    tabHistoryRef,
+    preferredPath: previousActivePath,
+  })
+  syncActiveTabPath(activeTabPathRef, setActiveTabPath, fallbackPath)
 }
 
 function runEntryFailureCallback(options: {
@@ -253,6 +405,10 @@ function handleRecoverableEntryLoadFailure(options: {
   kind: RecoverableEntryLoadFailureKind
   entry: VaultEntry
   callbackEntry: VaultEntry
+  previousActivePath: string | null
+  pendingOpenPathsRef: React.MutableRefObject<Set<string>>
+  tabHistoryRef: React.MutableRefObject<string[]>
+  latestLoadSeqByPathRef: React.MutableRefObject<Map<string, number>>
   tabsRef: React.MutableRefObject<Tab[]>
   activeTabPathRef: React.MutableRefObject<string | null>
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>
@@ -266,6 +422,10 @@ function handleRecoverableEntryLoadFailure(options: {
     kind,
     entry,
     callbackEntry,
+    previousActivePath,
+    pendingOpenPathsRef,
+    tabHistoryRef,
+    latestLoadSeqByPathRef,
     tabsRef,
     activeTabPathRef,
     setTabs,
@@ -278,17 +438,13 @@ function handleRecoverableEntryLoadFailure(options: {
 
   if (kind === 'missing-active-vault') {
     clearPrefetchCache()
-  }
+    pendingOpenPathsRef.current.clear()
+    latestLoadSeqByPathRef.current.clear()
+    tabHistoryRef.current = []
+    clearTabs(tabsRef, setTabs)
+    syncActiveTabPath(activeTabPathRef, setActiveTabPath, null)
+    failNoteOpenTrace(entry.path, kind)
 
-  resetFailedEntrySelection({
-    tabsRef,
-    activeTabPathRef,
-    setTabs,
-    setActiveTabPath,
-  })
-  failNoteOpenTrace(entry.path, kind)
-
-  if (kind === 'missing-active-vault') {
     runEntryFailureCallback({
       callback: onMissingActiveVault,
       entry: callbackEntry,
@@ -297,6 +453,23 @@ function handleRecoverableEntryLoadFailure(options: {
     })
     return
   }
+
+  if (findMatchingTab(tabsRef.current, entry.path)) {
+    removeTab(tabsRef, setTabs, entry.path)
+    forgetTabAccess(tabHistoryRef, entry.path)
+  }
+
+  resetFailedEntrySelection({
+    failedPath: entry.path,
+    previousActivePath,
+    pendingOpenPathsRef,
+    tabHistoryRef,
+    latestLoadSeqByPathRef,
+    tabsRef,
+    activeTabPathRef,
+    setActiveTabPath,
+  })
+  failNoteOpenTrace(entry.path, kind)
 
   if (kind === 'missing-path') {
     runEntryFailureCallback({
@@ -321,8 +494,11 @@ function handleRecoverableEntryLoadFailure(options: {
 function handleEntryLoadFailure(options: {
   entry: VaultEntry
   callbackEntry: VaultEntry
+  previousActivePath: string | null
   seq: number
-  navSeqRef: React.MutableRefObject<number>
+  pendingOpenPathsRef: React.MutableRefObject<Set<string>>
+  latestLoadSeqByPathRef: React.MutableRefObject<Map<string, number>>
+  tabHistoryRef: React.MutableRefObject<string[]>
   tabsRef: React.MutableRefObject<Tab[]>
   activeTabPathRef: React.MutableRefObject<string | null>
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>
@@ -335,8 +511,11 @@ function handleEntryLoadFailure(options: {
   const {
     entry,
     callbackEntry,
+    previousActivePath,
     seq,
-    navSeqRef,
+    pendingOpenPathsRef,
+    latestLoadSeqByPathRef,
+    tabHistoryRef,
     tabsRef,
     activeTabPathRef,
     setTabs,
@@ -348,7 +527,7 @@ function handleEntryLoadFailure(options: {
   } = options
 
   console.warn('Failed to load note content:', error)
-  if (navSeqRef.current !== seq) return
+  if (latestLoadSeqByPathRef.current.get(entry.path) !== seq) return
 
   const failureKind = getEntryLoadFailureKind(error)
   if (failureKind !== 'load-failed') {
@@ -356,6 +535,10 @@ function handleEntryLoadFailure(options: {
       kind: failureKind,
       entry,
       callbackEntry,
+      previousActivePath,
+      pendingOpenPathsRef,
+      tabHistoryRef,
+      latestLoadSeqByPathRef,
       tabsRef,
       activeTabPathRef,
       setTabs,
@@ -369,24 +552,42 @@ function handleEntryLoadFailure(options: {
   }
 
   resetFailedEntrySelection({
+    failedPath: entry.path,
+    previousActivePath,
+    pendingOpenPathsRef,
+    tabHistoryRef,
+    latestLoadSeqByPathRef,
     tabsRef,
     activeTabPathRef,
-    setTabs,
     setActiveTabPath,
   })
   failNoteOpenTrace(entry.path, 'load-failed')
 }
 
-function reopenAlreadyViewingEntry({
+function focusAlreadyOpenEntry({
   entry,
-  tabsRef,
-  activeTabPathRef,
-  setActiveTabPath,
+  replaceFromPath,
   hasUnsavedChanges,
-}: Pick<NavigateToEntryOptions, 'entry' | 'tabsRef' | 'activeTabPathRef' | 'setActiveTabPath' | 'hasUnsavedChanges'>): boolean {
+  tabsRef,
+  tabHistoryRef,
+  activeTabPathRef,
+  setTabs,
+  setActiveTabPath,
+}: Pick<NavigateToEntryOptions, 'entry' | 'replaceFromPath' | 'hasUnsavedChanges' | 'tabsRef' | 'tabHistoryRef' | 'activeTabPathRef' | 'setTabs' | 'setActiveTabPath'>): boolean {
   if (!isAlreadyViewingPath(tabsRef, activeTabPathRef, entry.path)) return false
-  if (!hasUnsavedChanges?.(entry.path)) return false
-  syncActiveTabPath(activeTabPathRef, setActiveTabPath, entry.path)
+
+  const isActivePath = notePathsMatch(activeTabPathRef.current, entry.path)
+  if (isActivePath && !replaceFromPath && !hasUnsavedChanges?.(entry.path)) {
+    return false
+  }
+
+  if (replaceFromPath && !notePathsMatch(replaceFromPath, entry.path)) {
+    removeTab(tabsRef, setTabs, replaceFromPath)
+    forgetTabAccess(tabHistoryRef, replaceFromPath)
+  }
+
+  const resolvedPath = findMatchingTabPath(tabsRef.current, entry.path) ?? entry.path
+  syncActiveTabSelection(activeTabPathRef, setActiveTabPath, tabHistoryRef, resolvedPath)
   finishNoteOpenTrace(entry.path)
   return true
 }
@@ -396,8 +597,12 @@ async function loadTextEntry(options: Required<Pick<NavigateToEntryOptions, 'for
     entry,
     sourceEntry,
     forceReload,
-    navSeqRef,
+    replaceFromPath,
+    loadSeqRef,
+    pendingOpenPathsRef,
+    latestLoadSeqByPathRef,
     tabsRef,
+    tabHistoryRef,
     activeTabPathRef,
     setTabs,
     setActiveTabPath,
@@ -406,10 +611,13 @@ async function loadTextEntry(options: Required<Pick<NavigateToEntryOptions, 'for
     onUnreadableNoteContent,
   } = options
 
-  const { seq, cachedEntry } = startEntryNavigation({
+  const { seq, cachedEntry, previousActivePath } = startEntryNavigation({
     entry,
-    navSeqRef,
+    loadSeqRef,
+    pendingOpenPathsRef,
+    latestLoadSeqByPathRef,
     activeTabPathRef,
+    tabHistoryRef,
     setActiveTabPath,
   })
 
@@ -421,22 +629,33 @@ async function loadTextEntry(options: Required<Pick<NavigateToEntryOptions, 'for
       cachedEntry,
     })
     markNoteOpenTrace(entry.path, 'contentLoadEnd')
+
     if (!shouldApplyLoadedEntry({
       seq,
-      navSeqRef,
-      content,
-      forceReload,
-      activeTabPathRef,
-      tabsRef,
       path: entry.path,
-    })) return
-    setSingleTab(tabsRef, setTabs, { entry, content })
+      latestLoadSeqByPathRef,
+      pendingOpenPathsRef,
+      tabsRef,
+    })) {
+      return
+    }
+
+    pendingOpenPathsRef.current.delete(entry.path)
+    latestLoadSeqByPathRef.current.delete(entry.path)
+    if (replaceFromPath && !notePathsMatch(replaceFromPath, entry.path)) {
+      forgetTabAccess(tabHistoryRef, replaceFromPath)
+    }
+    upsertTab(tabsRef, setTabs, { entry, content }, replaceFromPath)
+    finishNoteOpenTrace(entry.path)
   } catch (err) {
     handleEntryLoadFailure({
       entry,
       callbackEntry: callbackEntryForLoadFailure(entry, sourceEntry),
+      previousActivePath,
       seq,
-      navSeqRef,
+      pendingOpenPathsRef,
+      latestLoadSeqByPathRef,
+      tabHistoryRef,
       tabsRef,
       activeTabPathRef,
       setTabs,
@@ -457,113 +676,211 @@ async function navigateToEntry(options: NavigateToEntryOptions) {
     return
   }
 
-  if (!forceReload && reopenAlreadyViewingEntry(options)) return
+  if (!forceReload && focusAlreadyOpenEntry(options)) return
 
   await loadTextEntry({ ...options, forceReload })
 }
 
-export function useTabManagement(options: TabManagementOptions = {}) {
-  // Single-note model: tabs has 0 or 1 elements.
-  const [tabs, setTabs] = useState<Tab[]>([])
+export function useTabManagement(options: TabManagementOptions = {}): TabManagementResult {
+  const [tabs, setTabsState] = useState<Tab[]>([])
   const [activeTabPath, setActiveTabPath] = useState<string | null>(null)
   const activeTabPathRef = useRef(activeTabPath)
   const requestedActiveTabPathRef = useRef<string | null>(activeTabPath)
-  useEffect(() => { activeTabPathRef.current = activeTabPath })
-  const tabsRef = useRef(tabs)
-  useEffect(() => { tabsRef.current = tabs })
+  useEffect(() => { activeTabPathRef.current = activeTabPath }, [activeTabPath])
 
-  // Sequence counter for rapid-switch safety: only the latest navigation wins.
-  const navSeqRef = useRef(0)
+  const tabsRef = useRef<Tab[]>(tabs)
+  useEffect(() => { tabsRef.current = tabs }, [tabs])
+
+  const tabHistoryRef = useRef<string[]>([])
+  const loadSeqRef = useRef(0)
+  const pendingOpenPathsRef = useRef<Set<string>>(new Set())
+  const latestLoadSeqByPathRef = useRef<Map<string, number>>(new Map())
   const beforeNavigateSeqRef = useRef(0)
+
   const beforeNavigate = options.beforeNavigate
   const hasUnsavedChanges = options.hasUnsavedChanges
   const onMissingActiveVault = options.onMissingActiveVault
   const onMissingNotePath = options.onMissingNotePath
   const onUnreadableNoteContent = options.onUnreadableNoteContent
 
+  const setTabs: React.Dispatch<React.SetStateAction<Tab[]>> = useCallback((nextTabs) => {
+    setTabsState((currentTabs) => {
+      const resolvedTabs = typeof nextTabs === 'function'
+        ? (nextTabs as (currentTabs: Tab[]) => Tab[])(currentTabs)
+        : nextTabs
+      tabsRef.current = resolvedTabs
+      return resolvedTabs
+    })
+  }, [])
+
+  const runBeforeNavigate = useCallback(async (
+    fromPath: string | null,
+    toPath: string,
+    config: { force?: boolean } = {},
+  ) => {
+    const seq = ++beforeNavigateSeqRef.current
+    if (!beforeNavigate || !fromPath) return true
+    if (!config.force && notePathsMatch(fromPath, toPath)) return true
+
+    try {
+      markNoteOpenTrace(toPath, 'beforeNavigateStart')
+      await beforeNavigate(fromPath, toPath)
+      markNoteOpenTrace(toPath, 'beforeNavigateEnd')
+    } catch (err) {
+      console.warn('Failed to persist note before navigation:', err)
+      failNoteOpenTrace(toPath, 'before-navigate-failed')
+      return false
+    }
+
+    return beforeNavigateSeqRef.current === seq
+  }, [beforeNavigate])
+
   const executeNavigationWithBoundary = useCallback(async (
     targetPath: string,
     navigate: () => void | Promise<void>,
   ) => {
-    const seq = ++beforeNavigateSeqRef.current
     const currentPath = activeTabPathRef.current
-    if (beforeNavigate && currentPath && !notePathsMatch(currentPath, targetPath)) {
-      try {
-        markNoteOpenTrace(targetPath, 'beforeNavigateStart')
-        await beforeNavigate(currentPath, targetPath)
-        markNoteOpenTrace(targetPath, 'beforeNavigateEnd')
-      } catch (err) {
-        console.warn('Failed to persist note before navigation:', err)
-        failNoteOpenTrace(targetPath, 'before-navigate-failed')
-        return false
-      }
-      if (beforeNavigateSeqRef.current !== seq) return false
+    if (!beforeNavigate || !currentPath || notePathsMatch(currentPath, targetPath)) {
+      await navigate()
+      return true
     }
+
+    const navigable = await runBeforeNavigate(currentPath, targetPath)
+    if (!navigable) return false
     await navigate()
     return true
-  }, [beforeNavigate])
+  }, [beforeNavigate, runBeforeNavigate])
 
-  /** Open a note — replaces the current note (single-note model). */
   const handleSelectNote = useCallback(async (entry: VaultEntry) => {
     const openEntry = normalizeOpenEntry(entry)
     if (!openEntry) return
+
     requestedActiveTabPathRef.current = openEntry.path
-    const alreadyViewingDirtyEntry = notePathsMatch(openEntry.path, activeTabPathRef.current)
-      && !!hasUnsavedChanges?.(openEntry.path)
-    if (!alreadyViewingDirtyEntry) {
+    if (!notePathsMatch(openEntry.path, activeTabPathRef.current)) {
       beginNoteOpenTrace(openEntry.path, 'select-note')
     }
+
     const navigated = await executeNavigationWithBoundary(openEntry.path, () => navigateToEntry({
       entry: openEntry,
       sourceEntry: entry,
-      navSeqRef,
+      hasUnsavedChanges,
+      loadSeqRef,
+      pendingOpenPathsRef,
+      latestLoadSeqByPathRef,
       tabsRef,
+      tabHistoryRef,
       activeTabPathRef,
       setTabs,
       setActiveTabPath,
-      hasUnsavedChanges,
       onMissingActiveVault,
       onMissingNotePath,
       onUnreadableNoteContent,
     }))
+
     if (!navigated) {
       resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, openEntry.path)
     }
-  }, [executeNavigationWithBoundary, hasUnsavedChanges, onMissingActiveVault, onMissingNotePath, onUnreadableNoteContent])
+  }, [executeNavigationWithBoundary, hasUnsavedChanges, onMissingActiveVault, onMissingNotePath, onUnreadableNoteContent, setTabs])
 
   const handleSwitchTab = useCallback((path: string) => {
-    requestedActiveTabPathRef.current = path
-    syncActiveTabPath(activeTabPathRef, setActiveTabPath, path)
-  }, [])
+    const matchingPath = findMatchingTabPath(tabsRef.current, path)
+    if (!matchingPath) return
+
+    requestedActiveTabPathRef.current = matchingPath
+    void executeNavigationWithBoundary(matchingPath, async () => {
+      syncActiveTabSelection(activeTabPathRef, setActiveTabPath, tabHistoryRef, matchingPath)
+    }).then((navigated) => {
+      if (!navigated) {
+        resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, matchingPath)
+      }
+    })
+  }, [executeNavigationWithBoundary])
+
+  const handleCloseTab = useCallback((path: string) => {
+    const closingTabPath = findMatchingTabPath(tabsRef.current, path)
+    if (!closingTabPath) return
+
+    const isClosingActiveTab = notePathsMatch(activeTabPathRef.current, closingTabPath)
+    const remainingTabs = tabsRef.current.filter((tab) => !notePathsMatch(tab.entry.path, closingTabPath))
+    const remainingHistory = tabHistoryRef.current.filter((candidate) => !notePathsMatch(candidate, closingTabPath))
+    const nextActivePath = isClosingActiveTab
+      ? resolveFallbackActivePath({
+        tabsRef: { current: remainingTabs },
+        tabHistoryRef: { current: remainingHistory },
+      })
+      : activeTabPathRef.current
+
+    const finishClose = () => {
+      pendingOpenPathsRef.current.delete(closingTabPath)
+      latestLoadSeqByPathRef.current.delete(closingTabPath)
+      removeTab(tabsRef, setTabs, closingTabPath)
+      forgetTabAccess(tabHistoryRef, closingTabPath)
+      if (!isClosingActiveTab) return
+
+      requestedActiveTabPathRef.current = nextActivePath
+      syncActiveTabPath(activeTabPathRef, setActiveTabPath, nextActivePath)
+    }
+
+    if (!isClosingActiveTab) {
+      finishClose()
+      return
+    }
+
+    requestedActiveTabPathRef.current = nextActivePath
+    if (!beforeNavigate || !activeTabPathRef.current) {
+      finishClose()
+      return
+    }
+
+    void runBeforeNavigate(activeTabPathRef.current, nextActivePath ?? closingTabPath, { force: true }).then((navigated) => {
+      if (!navigated) {
+        requestedActiveTabPathRef.current = activeTabPathRef.current
+        return
+      }
+      finishClose()
+    })
+  }, [beforeNavigate, runBeforeNavigate, setTabs])
 
   /** Open a tab with known content — no IPC round-trip. Used for newly created notes. */
   const openTabWithContent = useCallback((entry: VaultEntry, content: string) => {
     const openEntry = normalizeOpenEntry(entry)
     if (!openEntry) return
+
     requestedActiveTabPathRef.current = openEntry.path
     void executeNavigationWithBoundary(openEntry.path, () => {
       cacheNoteContent(openEntry.path, content, openEntry)
-      setSingleTab(tabsRef, setTabs, { entry: openEntry, content })
-      syncActiveTabPath(activeTabPathRef, setActiveTabPath, openEntry.path)
+      pendingOpenPathsRef.current.delete(openEntry.path)
+      latestLoadSeqByPathRef.current.delete(openEntry.path)
+      upsertTab(tabsRef, setTabs, { entry: openEntry, content })
+      syncActiveTabSelection(activeTabPathRef, setActiveTabPath, tabHistoryRef, openEntry.path)
     }).then((navigated) => {
-      if (!navigated) resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, openEntry.path)
+      if (!navigated) {
+        resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, openEntry.path)
+      }
     })
-  }, [executeNavigationWithBoundary])
+  }, [executeNavigationWithBoundary, setTabs])
 
   const handleReplaceActiveTab = useCallback(async (entry: VaultEntry) => {
     const openEntry = normalizeOpenEntry(entry)
     if (!openEntry) return
+
     requestedActiveTabPathRef.current = openEntry.path
-    const replacingDifferentEntry = !notePathsMatch(openEntry.path, activeTabPathRef.current)
+    const replaceFromPath = activeTabPathRef.current
+    const replacingDifferentEntry = !replaceFromPath || !notePathsMatch(openEntry.path, replaceFromPath)
     if (replacingDifferentEntry) {
       beginNoteOpenTrace(openEntry.path, 'replace-active-tab')
     }
+
     const navigated = await executeNavigationWithBoundary(openEntry.path, () => navigateToEntry({
       entry: openEntry,
       sourceEntry: entry,
       forceReload: !replacingDifferentEntry,
-      navSeqRef,
+      replaceFromPath,
+      loadSeqRef,
+      pendingOpenPathsRef,
+      latestLoadSeqByPathRef,
       tabsRef,
+      tabHistoryRef,
       activeTabPathRef,
       setTabs,
       setActiveTabPath,
@@ -571,19 +888,22 @@ export function useTabManagement(options: TabManagementOptions = {}) {
       onMissingNotePath,
       onUnreadableNoteContent,
     }))
+
     if (!navigated) {
       resetRequestedPathIfStillPending(requestedActiveTabPathRef, activeTabPathRef, openEntry.path)
     }
-  }, [executeNavigationWithBoundary, onMissingActiveVault, onMissingNotePath, onUnreadableNoteContent])
+  }, [executeNavigationWithBoundary, onMissingActiveVault, onMissingNotePath, onUnreadableNoteContent, setTabs])
 
   const closeAllTabs = useCallback(() => {
-    navSeqRef.current += 1
+    loadSeqRef.current += 1
     beforeNavigateSeqRef.current += 1
-    tabsRef.current = []
-    setTabs([])
+    pendingOpenPathsRef.current.clear()
+    latestLoadSeqByPathRef.current.clear()
+    tabHistoryRef.current = []
+    clearTabs(tabsRef, setTabs)
     requestedActiveTabPathRef.current = null
     syncActiveTabPath(activeTabPathRef, setActiveTabPath, null)
-  }, [])
+  }, [setTabs])
 
   return {
     tabs,
@@ -594,6 +914,7 @@ export function useTabManagement(options: TabManagementOptions = {}) {
     handleSelectNote,
     openTabWithContent,
     handleSwitchTab,
+    handleCloseTab,
     handleReplaceActiveTab,
     closeAllTabs,
   }
