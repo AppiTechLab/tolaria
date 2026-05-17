@@ -66,6 +66,7 @@ import { useAppSave } from './hooks/useAppSave'
 import { useNoteRetargetingUi } from './hooks/useNoteRetargetingUi'
 import { useVaultBridge } from './hooks/useVaultBridge'
 import { useSavedViewOrdering } from './hooks/useSavedViewOrdering'
+import { normalizeVaultRelativePath } from './utils/notePathIdentity'
 import {
   useNeighborhoodEntry,
   useNeighborhoodEscape,
@@ -438,6 +439,10 @@ function App() {
       explicitOrganization: enabled,
     })
   }, [updateConfig, vaultConfig.inbox?.noteListProperties])
+
+  const handleSaveResearchLabMode = useCallback((researchLabMode: NonNullable<typeof vaultConfig.researchLabMode>) => {
+    updateConfig('researchLabMode', researchLabMode)
+  }, [updateConfig])
   const {
     aiAgentPreferences,
     allNotesFileVisibility,
@@ -865,20 +870,44 @@ function App() {
   }, [updateConfig, vaultConfig.inbox])
 
   const handleCreateFolder = useCallback(async (name: string) => {
+    const normalizedPath = normalizeVaultRelativePath(name)
+    const pathSegments = normalizedPath.split('/').filter(Boolean)
+    if (pathSegments.length === 0) {
+      setToastMessage('Failed to create folder: invalid folder path')
+      return false
+    }
+
     try {
-      if (isTauri()) {
-        await invoke('create_vault_folder', { vaultPath: resolvedPath, folderName: name })
-      } else {
-        await mockInvoke('create_vault_folder', { vaultPath: resolvedPath, folderName: name })
+      let folderPath = ''
+      for (let index = 0; index < pathSegments.length; index += 1) {
+        folderPath = folderPath ? `${folderPath}/${pathSegments[index]}` : pathSegments[index]
+
+        try {
+          if (isTauri()) {
+            await invoke('create_vault_folder', { vaultPath: resolvedPath, folderName: folderPath })
+          } else {
+            await mockInvoke('create_vault_folder', { vaultPath: resolvedPath, folderName: folderPath })
+          }
+        } catch (error) {
+          const message = `${error}`.toLocaleLowerCase()
+          if (!message.includes('already exists') || index === pathSegments.length - 1) {
+            throw error
+          }
+        }
       }
+
       await vault.reloadFolders()
-      setToastMessage(`Created folder "${name}"`)
+      setToastMessage(`Created folder "${normalizedPath}"`)
       return true
     } catch (e) {
       setToastMessage(`Failed to create folder: ${e}`)
       return false
     }
-  }, [resolvedPath, vault, setToastMessage])
+  }, [resolvedPath, setToastMessage, vault])
+
+  const handleOpenResearchLabFolder = useCallback((path: string) => {
+    handleSetSelection({ kind: 'folder', path: normalizeVaultRelativePath(path), rootPath: resolvedPath })
+  }, [handleSetSelection, resolvedPath])
 
   const folderActions = useFolderActions({
     vaultPath: resolvedPath,
@@ -1695,7 +1724,7 @@ function App() {
                   isVaultContentLoading ? (
                     <LabHomeViewLoading />
                   ) : (
-                    <LabHomeView locale={appLocale} />
+                    <LabHomeView locale={appLocale} rootPath={resolvedPath} entries={visibleEntries} folders={vault.folders} researchLabMode={vaultConfig.researchLabMode ?? null} onOpenFolder={handleOpenResearchLabFolder} onCreateFolder={handleCreateFolder} />
                   )
                 ) : (
                   <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!sidebarVisible} onCollapseNoteList={!sidebarVisible ? handleCollapseNoteList : undefined} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={noteListOpenNote} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
@@ -1832,7 +1861,7 @@ function App() {
           onCommit={conflictResolver.commitResolution}
           onClose={conflictFlow.handleCloseConflictResolver}
         />
-        <SettingsPanel open={dialogs.showSettings} initialSectionId={settingsInitialSectionId} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} vaults={vaultSwitcher.allVaults} defaultWorkspacePath={vaultSwitcher.defaultWorkspacePath} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onRemoveVault={vaultSwitcher.removeVault} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} isGitVault={isGitVault} onSave={saveSettings} onCopyMcpConfig={handleCopyMcpConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} onClose={dialogs.closeSettings} />
+        <SettingsPanel open={dialogs.showSettings} initialSectionId={settingsInitialSectionId} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} vaults={vaultSwitcher.allVaults} defaultWorkspacePath={vaultSwitcher.defaultWorkspacePath} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onRemoveVault={vaultSwitcher.removeVault} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} researchLabMode={vaultConfig.researchLabMode ?? null} vaultFolders={vault.folders} onSaveResearchLabMode={handleSaveResearchLabMode} isGitVault={isGitVault} onSave={saveSettings} onCopyMcpConfig={handleCopyMcpConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} onClose={dialogs.closeSettings} />
         <FeedbackDialog open={showFeedback} onClose={closeFeedback} />
         <McpSetupDialog open={showMcpSetupDialog} status={mcpStatus} busyAction={mcpDialogAction} manualConfigSnippet={mcpConfigSnippet} manualConfigLoading={mcpConfigLoading} manualConfigError={mcpConfigError} locale={appLocale} onClose={closeMcpSetupDialog} onConnect={handleConnectMcp} onCopyManualConfig={handleCopyMcpConfig} onDisconnect={handleDisconnectMcp} onLoadManualConfig={handleLoadMcpConfigSnippet} />
         <CloneVaultModal key={dialogs.showCloneVault ? 'clone-open' : 'clone-closed'} open={dialogs.showCloneVault} onClose={dialogs.closeCloneVault} onVaultCloned={vaultSwitcher.handleVaultCloned} />

@@ -184,6 +184,26 @@ export interface AllNotesConfig {
   noteListProperties: string[] | null
 }
 
+export type ResearchLabDomainKey = 'ongoingProjects' | 'projectAcquisition' | 'teaching' | 'labManagement'
+export type ResearchLabSystemFolderKey = 'templates' | 'views' | 'aiPrompts' | 'archive'
+export type ResearchLabFolderKey = ResearchLabDomainKey | ResearchLabSystemFolderKey
+
+export interface ResearchLabModeFolders {
+  ongoingProjects: string
+  projectAcquisition: string
+  teaching: string
+  labManagement: string
+  templates: string
+  views: string
+  aiPrompts: string
+  archive: string
+}
+
+export interface ResearchLabModeConfig {
+  enabled: boolean
+  folders: ResearchLabModeFolders
+}
+
 /** Vault-scoped UI configuration stored locally per vault path. */
 export type NoteLayout = 'centered' | 'left'
 
@@ -201,6 +221,7 @@ export interface VaultConfig {
   property_display_modes: Record<string, string> | null
   inbox?: InboxConfig | null
   allNotes?: AllNotesConfig | null
+  researchLabMode?: ResearchLabModeConfig | null
 }
 
 export interface PulseFile {

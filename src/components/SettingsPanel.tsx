@@ -59,6 +59,7 @@ import {
   SettingsSwitchRow,
 } from './SettingsControls'
 import { SettingsFooter } from './SettingsFooter'
+import { ResearchLabModeSettingsSection } from './ResearchLabModeSettingsSection'
 import { VaultContentSettingsSection } from './VaultContentSettingsSection'
 import { WorkspaceSettingsSection } from './WorkspaceSettingsSection'
 import {
@@ -74,7 +75,7 @@ import {
 } from '../utils/dateDisplay'
 import { Button } from './ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import type { NoteWidthMode } from '../types'
+import type { FolderNode, NoteWidthMode, ResearchLabModeConfig } from '../types'
 import type { VaultOption } from './status-bar/types'
 import { SETTINGS_SECTION_IDS } from './settingsSectionIds'
 import {
@@ -82,6 +83,13 @@ import {
   trackTelemetryConsentChange,
 } from './settingsPreferenceTracking'
 import { useSettingsPanelAutofocus, useSettingsPanelFocusTrap } from './useSettingsPanelFocus'
+import {
+  createDefaultResearchLabModeConfig,
+  flattenResearchLabFolderPaths,
+  normalizeResearchLabModeConfig,
+  validateResearchLabModeConfig,
+  type ResearchLabValidationResult,
+} from '../utils/researchLabMode'
 
 interface SettingsPanelProps {
   open: boolean
@@ -97,6 +105,9 @@ interface SettingsPanelProps {
   onRemoveVault?: (path: string) => void
   onSetDefaultWorkspace?: (path: string) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
+  researchLabMode?: ResearchLabModeConfig | null
+  vaultFolders?: FolderNode[]
+  onSaveResearchLabMode?: (config: ResearchLabModeConfig) => void
   isGitVault?: boolean
   explicitOrganizationEnabled?: boolean
   onSaveExplicitOrganization?: (enabled: boolean) => void
@@ -178,6 +189,12 @@ interface SettingsBodyProps {
   onRemoveVault?: (path: string) => void
   onSetDefaultWorkspace?: (path: string) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
+  researchLabMode: ResearchLabModeConfig
+  setResearchLabMode: (value: ResearchLabModeConfig) => void
+  researchLabModeValidation: ResearchLabValidationResult | null
+  validateResearchLabMode: () => void
+  resetResearchLabMode: () => void
+  vaultFolders: FolderNode[]
   explicitOrganization: boolean
   setExplicitOrganization: (value: boolean) => void
   crashReporting: boolean
@@ -303,6 +320,9 @@ export function SettingsPanel({
   onRemoveVault,
   onSetDefaultWorkspace,
   onUpdateWorkspaceIdentity,
+  researchLabMode = createDefaultResearchLabModeConfig(),
+  vaultFolders = [],
+  onSaveResearchLabMode,
   isGitVault = true,
   explicitOrganizationEnabled = true,
   onSaveExplicitOrganization,
@@ -324,6 +344,9 @@ export function SettingsPanel({
       onRemoveVault={onRemoveVault}
       onSetDefaultWorkspace={onSetDefaultWorkspace}
       onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
+      researchLabMode={researchLabMode}
+      vaultFolders={vaultFolders}
+      onSaveResearchLabMode={onSaveResearchLabMode}
       isGitVault={isGitVault}
       explicitOrganizationEnabled={explicitOrganizationEnabled}
       onSaveExplicitOrganization={onSaveExplicitOrganization}
@@ -353,12 +376,17 @@ function SettingsPanelInner({
   onRemoveVault,
   onSetDefaultWorkspace,
   onUpdateWorkspaceIdentity,
+  researchLabMode,
+  vaultFolders,
+  onSaveResearchLabMode,
   isGitVault,
   explicitOrganizationEnabled,
   onSaveExplicitOrganization,
   onClose,
 }: SettingsPanelInnerProps) {
   const [draft, setDraft] = useState(() => createSettingsDraft(settings, explicitOrganizationEnabled))
+  const [researchLabModeDraft, setResearchLabModeDraft] = useState(() => normalizeResearchLabModeConfig(researchLabMode))
+  const [researchLabModeValidation, setResearchLabModeValidation] = useState<ResearchLabValidationResult | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const draftLocale = resolveEffectiveLocale(draft.uiLanguage, [systemLocale])
   const t = createTranslator(draftLocale)
@@ -366,6 +394,11 @@ function SettingsPanelInner({
   useEffect(() => {
     setDraft(createSettingsDraft(settings, explicitOrganizationEnabled))
   }, [explicitOrganizationEnabled, settings])
+
+  useEffect(() => {
+    setResearchLabModeDraft(normalizeResearchLabModeConfig(researchLabMode))
+    setResearchLabModeValidation(null)
+  }, [researchLabMode])
 
   useSettingsPanelAutofocus(panelRef)
   useSettingsPanelFocusTrap(panelRef)
@@ -402,13 +435,45 @@ function SettingsPanelInner({
     onSave({ ...settings, theme_mode: value })
   }, [onSave, settings, updateDraft])
 
+  const updateResearchLabMode = useCallback((value: ResearchLabModeConfig) => {
+    setResearchLabModeDraft(value)
+    setResearchLabModeValidation(null)
+  }, [])
+
+  const validateResearchLabMode = useCallback(() => {
+    const result = validateResearchLabModeConfig(
+      researchLabModeDraft,
+      flattenResearchLabFolderPaths(vaultFolders),
+    )
+    setResearchLabModeValidation(result)
+    return result
+  }, [researchLabModeDraft, vaultFolders])
+
+  const resetResearchLabMode = useCallback(() => {
+    setResearchLabModeDraft((current) => ({
+      ...createDefaultResearchLabModeConfig(),
+      enabled: current.enabled,
+    }))
+    setResearchLabModeValidation(null)
+  }, [])
+
   const handleSave = useCallback(() => {
+    const researchLabValidation = validateResearchLabModeConfig(
+      researchLabModeDraft,
+      flattenResearchLabFolderPaths(vaultFolders),
+    )
+    if (researchLabValidation.errors.length > 0) {
+      setResearchLabModeValidation(researchLabValidation)
+      return
+    }
+
     trackTelemetryConsentChange(settings.analytics_enabled === true, draft.analytics)
     trackSettingsPreferenceChanges(settings, draft)
     onSave(buildSettingsFromDraft(settings, draft))
+    onSaveResearchLabMode?.(normalizeResearchLabModeConfig(researchLabModeDraft))
     onSaveExplicitOrganization?.(draft.explicitOrganization)
     onClose()
-  }, [draft, onClose, onSave, onSaveExplicitOrganization, settings])
+  }, [draft, onClose, onSave, onSaveExplicitOrganization, onSaveResearchLabMode, researchLabModeDraft, settings, vaultFolders])
 
   const handleBackdropClick = useCallback((event: ReactMouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) onClose()
@@ -458,6 +523,12 @@ function SettingsPanelInner({
           onRemoveVault={onRemoveVault}
           onSetDefaultWorkspace={onSetDefaultWorkspace}
           onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
+          researchLabMode={researchLabModeDraft}
+          setResearchLabMode={updateResearchLabMode}
+          researchLabModeValidation={researchLabModeValidation}
+          validateResearchLabMode={validateResearchLabMode}
+          resetResearchLabMode={resetResearchLabMode}
+          vaultFolders={vaultFolders}
           setThemeMode={handleThemeModeChange}
           setHideGitignoredFiles={handleGitignoredVisibilityChange}
           setAllNotesFileVisibility={handleAllNotesFileVisibilityChange}
@@ -502,6 +573,12 @@ interface SettingsBodyFromDraftProps {
   onRemoveVault?: (path: string) => void
   onSetDefaultWorkspace?: (path: string) => void
   onUpdateWorkspaceIdentity?: (path: string, patch: Partial<VaultOption>) => void
+  researchLabMode: ResearchLabModeConfig
+  setResearchLabMode: (value: ResearchLabModeConfig) => void
+  researchLabModeValidation: ResearchLabValidationResult | null
+  validateResearchLabMode: () => void
+  resetResearchLabMode: () => void
+  vaultFolders: FolderNode[]
   setThemeMode: (value: ThemeMode) => void
   setHideGitignoredFiles: (value: boolean) => void
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
@@ -521,6 +598,12 @@ function SettingsBodyFromDraft({
   onRemoveVault,
   onSetDefaultWorkspace,
   onUpdateWorkspaceIdentity,
+  researchLabMode,
+  setResearchLabMode,
+  researchLabModeValidation,
+  validateResearchLabMode,
+  resetResearchLabMode,
+  vaultFolders,
   setThemeMode,
   setHideGitignoredFiles,
   setAllNotesFileVisibility,
@@ -576,6 +659,12 @@ function SettingsBodyFromDraft({
       onRemoveVault={onRemoveVault}
       onSetDefaultWorkspace={onSetDefaultWorkspace}
       onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
+      researchLabMode={researchLabMode}
+      setResearchLabMode={setResearchLabMode}
+      researchLabModeValidation={researchLabModeValidation}
+      validateResearchLabMode={validateResearchLabMode}
+      resetResearchLabMode={resetResearchLabMode}
+      vaultFolders={vaultFolders}
       explicitOrganization={draft.explicitOrganization}
       setExplicitOrganization={(value) => updateDraft('explicitOrganization', value)}
       crashReporting={draft.crashReporting}
@@ -698,25 +787,44 @@ function SettingsContentSections({
   setHideGitignoredFiles,
   allNotesFileVisibility,
   setAllNotesFileVisibility,
+  researchLabMode,
+  setResearchLabMode,
+  researchLabModeValidation,
+  validateResearchLabMode,
+  resetResearchLabMode,
+  vaultFolders,
 }: SettingsBodyProps) {
   return (
-    <SettingsSection id={SETTINGS_SECTION_IDS.content}>
-      <VaultContentSettingsSection
-        t={t}
-        dateDisplayFormat={dateDisplayFormat}
-        setDateDisplayFormat={setDateDisplayFormat}
-        defaultNoteWidth={defaultNoteWidth}
-        setDefaultNoteWidth={setDefaultNoteWidth}
-        sidebarTypePluralizationEnabled={sidebarTypePluralizationEnabled}
-        setSidebarTypePluralizationEnabled={setSidebarTypePluralizationEnabled}
-        initialH1AutoRename={initialH1AutoRename}
-        setInitialH1AutoRename={setInitialH1AutoRename}
-        hideGitignoredFiles={hideGitignoredFiles}
-        setHideGitignoredFiles={setHideGitignoredFiles}
-        allNotesFileVisibility={allNotesFileVisibility}
-        setAllNotesFileVisibility={setAllNotesFileVisibility}
-      />
-    </SettingsSection>
+    <>
+      <SettingsSection id={SETTINGS_SECTION_IDS.content}>
+        <VaultContentSettingsSection
+          t={t}
+          dateDisplayFormat={dateDisplayFormat}
+          setDateDisplayFormat={setDateDisplayFormat}
+          defaultNoteWidth={defaultNoteWidth}
+          setDefaultNoteWidth={setDefaultNoteWidth}
+          sidebarTypePluralizationEnabled={sidebarTypePluralizationEnabled}
+          setSidebarTypePluralizationEnabled={setSidebarTypePluralizationEnabled}
+          initialH1AutoRename={initialH1AutoRename}
+          setInitialH1AutoRename={setInitialH1AutoRename}
+          hideGitignoredFiles={hideGitignoredFiles}
+          setHideGitignoredFiles={setHideGitignoredFiles}
+          allNotesFileVisibility={allNotesFileVisibility}
+          setAllNotesFileVisibility={setAllNotesFileVisibility}
+        />
+      </SettingsSection>
+      <SettingsSection id={SETTINGS_SECTION_IDS.researchLabMode}>
+        <ResearchLabModeSettingsSection
+          t={t}
+          config={researchLabMode}
+          folders={vaultFolders}
+          validation={researchLabModeValidation}
+          onChange={setResearchLabMode}
+          onValidate={validateResearchLabMode}
+          onReset={resetResearchLabMode}
+        />
+      </SettingsSection>
+    </>
   )
 }
 

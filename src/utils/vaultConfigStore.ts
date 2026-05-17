@@ -3,6 +3,10 @@ import {
   DEFAULT_AI_AGENT_PERMISSION_MODE,
   normalizeAiAgentPermissionMode,
 } from '../lib/aiAgentPermissionMode'
+import {
+  createDefaultResearchLabModeConfig,
+  normalizeResearchLabModeConfig,
+} from './researchLabMode'
 
 type SaveFn = (config: VaultConfig) => void
 type Listener = () => void
@@ -12,6 +16,7 @@ const DEFAULT_CONFIG: VaultConfig = {
   ai_agent_permission_mode: DEFAULT_AI_AGENT_PERMISSION_MODE,
   tag_colors: null, status_colors: null, property_display_modes: null,
   inbox: null, allNotes: null,
+  researchLabMode: createDefaultResearchLabModeConfig(),
 }
 
 let config: VaultConfig = DEFAULT_CONFIG
@@ -53,5 +58,6 @@ function normalizeVaultConfig(next: VaultConfig): VaultConfig {
     ...DEFAULT_CONFIG,
     ...next,
     ai_agent_permission_mode: normalizeAiAgentPermissionMode(next.ai_agent_permission_mode),
+    researchLabMode: normalizeResearchLabModeConfig(next.researchLabMode),
   }
 }

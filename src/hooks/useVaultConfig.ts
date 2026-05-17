@@ -12,6 +12,7 @@ import {
 } from '../utils/vaultConfigStore'
 import { migrateLocalStorageToVaultConfig } from '../utils/configMigration'
 import { DEFAULT_AI_AGENT_PERMISSION_MODE } from '../lib/aiAgentPermissionMode'
+import { createDefaultResearchLabModeConfig } from '../utils/researchLabMode'
 
 const STORAGE_PREFIX = 'laputa:vault-config:'
 
@@ -25,6 +26,7 @@ function loadFromStorage(vaultPath: string): VaultConfig {
     ai_agent_permission_mode: DEFAULT_AI_AGENT_PERMISSION_MODE,
     tag_colors: null, status_colors: null, property_display_modes: null,
     inbox: null, allNotes: null,
+    researchLabMode: createDefaultResearchLabModeConfig(),
   }
   try {
     const raw = localStorage.getItem(storageKey(vaultPath))

@@ -1,31 +1,164 @@
 import type { AppLocale } from '../lib/i18n'
 import { translate } from '../lib/i18n'
+import type { FolderNode, ResearchLabModeConfig, VaultEntry } from '../types'
+import { filterEntries } from '../utils/noteListHelpers'
+import { Button } from './ui/button'
 import { Card, CardContent, CardHeader } from './ui/card'
+import {
+  flattenResearchLabFolderPaths,
+  researchLabFolderExists,
+} from '../utils/researchLabMode'
 
 const LAB_HOME_SECTIONS = [
   {
+    key: 'ongoingProjects',
     id: 'ongoing-projects',
     titleKey: 'labHome.section.ongoingProjects.title',
     emptyKey: 'labHome.section.ongoingProjects.empty',
   },
   {
+    key: 'projectAcquisition',
     id: 'project-acquisition',
     titleKey: 'labHome.section.projectAcquisition.title',
     emptyKey: 'labHome.section.projectAcquisition.empty',
   },
   {
+    key: 'teaching',
     id: 'teaching',
     titleKey: 'labHome.section.teaching.title',
     emptyKey: 'labHome.section.teaching.empty',
   },
   {
+    key: 'labManagement',
     id: 'lab-management',
     titleKey: 'labHome.section.labManagement.title',
     emptyKey: 'labHome.section.labManagement.empty',
   },
 ] as const
 
-export function LabHomeView({ locale = 'en' }: { locale?: AppLocale }) {
+type LabHomeSection = typeof LAB_HOME_SECTIONS[number]
+
+interface LabHomeViewProps {
+  locale?: AppLocale
+  rootPath?: string
+  entries?: VaultEntry[]
+  folders?: FolderNode[]
+  researchLabMode?: ResearchLabModeConfig | null
+  onOpenFolder?: (path: string) => void
+  onCreateFolder?: (path: string) => Promise<boolean> | boolean
+}
+
+function sectionFolderPath(section: LabHomeSection, researchLabMode?: ResearchLabModeConfig | null): string {
+  return researchLabMode?.folders[section.key] ?? ''
+}
+
+function sectionEntries(
+  entries: VaultEntry[],
+  folderPath: string,
+  rootPath?: string,
+): VaultEntry[] {
+  if (!folderPath) return []
+  return filterEntries(entries, { kind: 'folder', path: folderPath, rootPath })
+}
+
+function LabHomeSectionBody({
+  existingFolderPaths,
+  entries,
+  locale,
+  onCreateFolder,
+  onOpenFolder,
+  researchLabMode,
+  rootPath,
+  section,
+}: {
+  existingFolderPaths: string[]
+  entries: VaultEntry[]
+  locale: AppLocale
+  onCreateFolder?: (path: string) => Promise<boolean> | boolean
+  onOpenFolder?: (path: string) => void
+  researchLabMode?: ResearchLabModeConfig | null
+  rootPath?: string
+  section: LabHomeSection
+}) {
+  if (researchLabMode?.enabled !== true) {
+    return <p className="text-sm leading-6 text-muted-foreground">{translate(locale, section.emptyKey)}</p>
+  }
+
+  const folderPath = sectionFolderPath(section, researchLabMode)
+  const folderExists = researchLabFolderExists(folderPath, existingFolderPaths)
+  const visibleEntries = folderExists ? sectionEntries(entries, folderPath, rootPath) : []
+  const previewEntries = visibleEntries.slice(0, 4)
+
+  return (
+    <div className="flex w-full flex-col gap-4">
+      <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2 text-xs font-medium text-muted-foreground">
+        {folderPath}
+      </div>
+      {!folderExists ? (
+        <>
+          <p className="text-sm leading-6 text-muted-foreground">{translate(locale, 'labHome.status.folderMissing')}</p>
+          <div>
+            <Button
+              type="button"
+              size="xs"
+              variant="secondary"
+              data-testid={`lab-home-create-folder-${section.key}`}
+              onClick={() => { void onCreateFolder?.(folderPath) }}
+            >
+              {translate(locale, 'sidebar.action.createFolder')}
+            </Button>
+          </div>
+        </>
+      ) : previewEntries.length > 0 ? (
+        <>
+          <div className="space-y-2">
+            {previewEntries.map((entry) => (
+              <div key={entry.path} className="truncate text-sm text-foreground">{entry.title}</div>
+            ))}
+          </div>
+          <div>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              data-testid={`lab-home-open-folder-${section.key}`}
+              onClick={() => onOpenFolder?.(folderPath)}
+            >
+              {translate(locale, 'labHome.action.openFolder')}
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm leading-6 text-muted-foreground">{translate(locale, section.emptyKey)}</p>
+          <div>
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              data-testid={`lab-home-open-folder-${section.key}`}
+              onClick={() => onOpenFolder?.(folderPath)}
+            >
+              {translate(locale, 'labHome.action.openFolder')}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+export function LabHomeView({
+  locale = 'en',
+  rootPath,
+  entries = [],
+  folders = [],
+  researchLabMode = null,
+  onOpenFolder,
+  onCreateFolder,
+}: LabHomeViewProps) {
+  const existingFolderPaths = flattenResearchLabFolderPaths(folders)
+
   return (
     <div data-testid="lab-home-view" className="h-full overflow-auto bg-background">
       <div className="mx-auto flex max-w-6xl flex-col gap-4 p-4 md:p-6">
@@ -39,7 +172,16 @@ export function LabHomeView({ locale = 'en' }: { locale?: AppLocale }) {
                 <h2 className="text-base font-semibold text-foreground">{translate(locale, section.titleKey)}</h2>
               </CardHeader>
               <CardContent className="flex flex-1 items-center py-5">
-                <p className="text-sm leading-6 text-muted-foreground">{translate(locale, section.emptyKey)}</p>
+                <LabHomeSectionBody
+                  existingFolderPaths={existingFolderPaths}
+                  entries={entries}
+                  locale={locale}
+                  onCreateFolder={onCreateFolder}
+                  onOpenFolder={onOpenFolder}
+                  researchLabMode={researchLabMode}
+                  rootPath={rootPath}
+                  section={section}
+                />
               </CardContent>
             </Card>
           ))}

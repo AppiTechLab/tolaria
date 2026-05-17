@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
-import type { Settings } from '../types'
+import type { ResearchLabModeConfig, Settings } from '../types'
 import { THEME_MODE_STORAGE_KEY } from '../lib/themeMode'
 import type { AiAgentsStatus } from '../lib/aiAgents'
 import type { VaultOption } from './StatusBar'
@@ -39,6 +39,20 @@ const workspaceVaults: VaultOption[] = [
   { label: 'Personal Notes', path: '/personal', alias: 'personal', color: 'purple', available: true, mounted: true },
   { label: 'Team Vault', path: '/team', alias: 'team', available: true, mounted: false },
 ]
+
+const emptyResearchLabMode: ResearchLabModeConfig = {
+  enabled: false,
+  folders: {
+    ongoingProjects: 'Projects/Ongoing',
+    projectAcquisition: 'Projects/Acquisition',
+    teaching: 'Teaching',
+    labManagement: 'Lab Management',
+    templates: 'Templates',
+    views: 'views',
+    aiPrompts: 'AI Prompts',
+    archive: 'Archive',
+  },
+}
 
 function installPointerCapturePolyfill() {
   if (!HTMLElement.prototype.hasPointerCapture) {
@@ -730,6 +744,35 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByTestId('settings-save'))
 
     expect(onSaveExplicitOrganization).toHaveBeenCalledWith(false)
+  })
+
+  it('saves research lab mode mappings through the dedicated vault-config callback', () => {
+    const onSaveResearchLabMode = vi.fn()
+
+    render(
+      <SettingsPanel
+        {...({
+          open: true,
+          settings: emptySettings,
+          onSave,
+          onClose,
+          researchLabMode: emptyResearchLabMode,
+          vaultFolders: [{ name: 'Projects', path: 'Projects', children: [] }],
+          onSaveResearchLabMode,
+        } as never)}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Enable Research Lab Mode' }))
+    fireEvent.change(screen.getByLabelText('Folder for Ongoing Projects'), {
+      target: { value: 'Projects/Active' },
+    })
+    saveSettingsPanel()
+
+    expect(onSaveResearchLabMode).toHaveBeenCalledWith(expect.objectContaining({
+      enabled: true,
+      folders: expect.objectContaining({ ongoingProjects: 'Projects/Active' }),
+    }))
   })
 
   it('saves the auto-advance inbox preference when toggled on', () => {

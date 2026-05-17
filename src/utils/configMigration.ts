@@ -30,6 +30,7 @@ export function migrateLocalStorageToVaultConfig(loaded: VaultConfig | null): Va
   const base: VaultConfig = loaded ?? {
     zoom: null, view_mode: null, editor_mode: null, tag_colors: null,
     status_colors: null, property_display_modes: null, inbox: null,
+    allNotes: null, researchLabMode: null,
   }
 
   copyLegacyAppStorageKeys()

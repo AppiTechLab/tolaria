@@ -14,6 +14,7 @@ export function SettingsBodyNav({ t }: SettingsBodyNavProps) {
     { id: SETTINGS_SECTION_IDS.autogit, label: t('settings.autogit.title'), Icon: GitBranch },
     { id: SETTINGS_SECTION_IDS.appearance, label: t('settings.appearance.title'), Icon: Palette },
     { id: SETTINGS_SECTION_IDS.content, label: t('settings.vaultContent.title'), Icon: Folder },
+    { id: SETTINGS_SECTION_IDS.researchLabMode, label: t('settings.researchLabMode.title'), Icon: Folder },
     { id: SETTINGS_SECTION_IDS.ai, label: t('settings.aiAgents.title'), Icon: Bot },
     { id: SETTINGS_SECTION_IDS.workflow, label: t('settings.workflow.title'), Icon: ListChecks },
     { id: SETTINGS_SECTION_IDS.privacy, label: t('settings.privacy.title'), Icon: ShieldCheck },
