@@ -15,6 +15,7 @@ import { StatusBar } from './components/StatusBar'
 import { SettingsPanel } from './components/SettingsPanel'
 import { CloneVaultModal } from './components/CloneVaultModal'
 import { FeedbackDialog } from './components/FeedbackDialog'
+import { LabHomeView, LabHomeViewLoading } from './components/LabHomeView'
 import { McpSetupDialog } from './components/McpSetupDialog'
 import { NoteRetargetingDialogs } from './components/note-retargeting/NoteRetargetingDialogs'
 import { StartupScreen } from './components/StartupScreen'
@@ -90,7 +91,6 @@ import { getPulledVaultUpdateOptions, refreshPulledVaultState } from './utils/pu
 import { isNoteWindow, getNoteWindowParams } from './utils/windowMode'
 import { GitSetupDialog } from './components/GitRequiredModal'
 import { RenameDetectedBanner } from './components/RenameDetectedBanner'
-import { Button } from './components/ui/button'
 import { openNoteListPropertiesPicker } from './components/note-list/noteListPropertiesEvents'
 import type { NoteListMultiSelectionCommands } from './components/note-list/multiSelectionCommands'
 import { focusNoteIconPropertyEditor } from './components/noteIconPropertyEvents'
@@ -1682,23 +1682,9 @@ function App() {
                   <PulseView vaultPath={gitSurfaces.historyRepositoryPath} onOpenNote={handlePulseOpenNote} sidebarCollapsed={!sidebarVisible} onExpandSidebar={() => handleSetViewMode('all')} repositories={gitRepositories} selectedRepositoryPath={gitSurfaces.historyRepositoryPath} onRepositoryChange={gitSurfaces.setHistoryRepositoryPath} locale={appLocale} />
                 ) : isLabHomeSelection ? (
                   isVaultContentLoading ? (
-                    <div data-testid="note-list-loading-skeleton" className="animate-pulse p-3">
-                      <div className="mb-3 h-10 rounded bg-muted" />
-                      <div className="space-y-3">
-                        <div className="h-20 rounded border border-border bg-background/70" />
-                        <div className="h-20 rounded border border-border bg-background/70" />
-                        <div className="h-20 rounded border border-border bg-background/70" />
-                      </div>
-                    </div>
+                    <LabHomeViewLoading />
                   ) : (
-                    <div data-testid="lab-home-placeholder" className="flex h-full items-center justify-center p-6">
-                      <div className="w-full max-w-sm rounded-xl border border-dashed border-border bg-background/80 p-6 text-center shadow-sm">
-                        <h2 className="text-lg font-semibold text-foreground">{translate(appLocale, 'sidebar.nav.labHome')}</h2>
-                        <Button type="button" variant="outline" className="mt-4" onClick={() => handleSetSelection({ kind: 'filter', filter: 'all' })}>
-                          {translate(appLocale, 'sidebar.nav.allNotes')}
-                        </Button>
-                      </div>
-                    </div>
+                    <LabHomeView locale={appLocale} />
                   )
                 ) : (
                   <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!sidebarVisible} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={handleReplaceActiveTabWithQueuedDiff} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />

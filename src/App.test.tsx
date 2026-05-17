@@ -521,10 +521,10 @@ describe('App', () => {
 
   it('loads and displays vault entries in sidebar', async () => {
     render(<App />)
-    const labHomePlaceholder = await screen.findByTestId('lab-home-placeholder')
+    const topNav = await screen.findByTestId('sidebar-top-nav')
 
     await act(async () => {
-      fireEvent.click(within(labHomePlaceholder).getByRole('button', { name: 'All Notes' }))
+      fireEvent.click(within(topNav).getByText('All Notes'))
       await Promise.resolve()
     })
 
@@ -666,7 +666,7 @@ describe('App', () => {
       })
 
       await act(async () => {
-        fireEvent.click(within(screen.getByTestId('lab-home-placeholder')).getByRole('button', { name: 'All Notes' }))
+        fireEvent.click(within(screen.getByTestId('sidebar-top-nav')).getByText('All Notes'))
         await Promise.resolve()
       })
 
@@ -1103,14 +1103,14 @@ describe('App', () => {
     configureNeighborhoodVault()
 
     render(<App />)
-    const labHomePlaceholder = await screen.findByTestId('lab-home-placeholder')
+    const topNav = await screen.findByTestId('sidebar-top-nav')
 
     await waitFor(() => {
-      expect(within(labHomePlaceholder).getByRole('button', { name: 'All Notes' })).toBeInTheDocument()
+      expect(within(topNav).getByText('All Notes')).toBeInTheDocument()
     })
 
     await act(async () => {
-      fireEvent.click(within(labHomePlaceholder).getByRole('button', { name: 'All Notes' }))
+      fireEvent.click(within(topNav).getByText('All Notes'))
       await Promise.resolve()
     })
 
@@ -1163,11 +1163,44 @@ describe('App', () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('lab-home-placeholder')).toHaveTextContent('Lab Home')
+      expect(screen.getByTestId('lab-home-view')).toHaveTextContent('Lab Home')
+      expect(screen.getByRole('heading', { name: 'Ongoing Projects' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Project Acquisition' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Teaching' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Lab Management' })).toBeInTheDocument()
+      expect(screen.getByText('No active project data loaded yet.')).toBeInTheDocument()
+      expect(screen.getByText('No proposal pipeline data loaded yet.')).toBeInTheDocument()
+      expect(screen.getByText('No teaching data loaded yet.')).toBeInTheDocument()
+      expect(screen.getByText('No lab management data loaded yet.')).toBeInTheDocument()
     })
 
     expect(screen.queryByTestId('note-list-container')).not.toBeInTheDocument()
     expect(within(screen.getByTestId('sidebar-top-nav')).queryByText('Inbox')).not.toBeInTheDocument()
+  })
+
+  it('reopens the Lab Home dashboard when clicking the sidebar item', async () => {
+    render(<App />)
+
+    const topNav = await screen.findByTestId('sidebar-top-nav')
+
+    await act(async () => {
+      fireEvent.click(within(topNav).getByText('All Notes'))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('note-list-container')).toBeInTheDocument()
+    })
+
+    await act(async () => {
+      fireEvent.click(within(topNav).getByText('Lab Home'))
+      await Promise.resolve()
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId('lab-home-view')).toBeInTheDocument()
+      expect(screen.queryByTestId('note-list-container')).not.toBeInTheDocument()
+    })
   })
 
   it('opens favorites directly into Neighborhood mode', async () => {
