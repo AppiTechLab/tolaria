@@ -15,11 +15,12 @@ import { SlidersHorizontal } from 'lucide-react'
 import {
   ArrowLeft, ArrowRight, Palette, PencilSimple, Plus, SidebarSimple, Trash,
 } from '@phosphor-icons/react'
+import { Buildings, FolderSimple, GraduationCap, Target } from '@phosphor-icons/react'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../../hooks/appCommandCatalog'
 import { Button } from '@/components/ui/button'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
 import {
-  type SectionGroup, isSelectionActive, SectionContent, VisibilityPopover,
+  type SectionGroup, isSelectionActive, NavItem, SectionContent, VisibilityPopover,
 } from '../SidebarParts'
 import { TypeCustomizePopover } from '../TypeCustomizePopover'
 import { useDragRegion } from '../../hooks/useDragRegion'
@@ -29,10 +30,44 @@ import { computeReorder } from './sidebarHooks'
 import { SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM } from './sidebarStyles'
 import { countByFilter } from '../../utils/noteListHelpers'
 import { viewIdentityKey, viewSelectionForView } from '../../utils/viewIdentity'
+import { normalizeVaultRelativePath } from '../../utils/notePathIdentity'
 import { translate, type AppLocale } from '../../lib/i18n'
+import type { ResearchLabDomainKey, ResearchLabModeConfig } from '../../types'
 
 export { SidebarTopNav } from './SidebarTopNav'
 export { FavoritesSection } from './FavoritesSection'
+
+const LAB_HOME_SECTION_ITEMS: Array<{
+  id: string
+  key: ResearchLabDomainKey
+  labelKey: string
+  icon: typeof FolderSimple
+}> = [
+  {
+    id: 'ongoing-projects',
+    key: 'ongoingProjects',
+    labelKey: 'labHome.section.ongoingProjects.title',
+    icon: FolderSimple,
+  },
+  {
+    id: 'project-acquisition',
+    key: 'projectAcquisition',
+    labelKey: 'labHome.section.projectAcquisition.title',
+    icon: Target,
+  },
+  {
+    id: 'teaching',
+    key: 'teaching',
+    labelKey: 'labHome.section.teaching.title',
+    icon: GraduationCap,
+  },
+  {
+    id: 'lab-management',
+    key: 'labManagement',
+    labelKey: 'labHome.section.labManagement.title',
+    icon: Buildings,
+  },
+]
 
 const SIDEBAR_TITLE_BAR_ACTION_CLASSNAME =
   '!h-auto !w-auto !min-w-0 !rounded-none !p-0 text-muted-foreground hover:!bg-transparent hover:text-foreground [&_svg]:!size-4'
@@ -143,6 +178,58 @@ export function ViewsSection({
               </SortableContext>
             </DndContext>
           ) : views.map(renderViewItem)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function ResearchLabHomeSection({
+  researchLabMode,
+  selection,
+  onSelect,
+  collapsed,
+  onToggle,
+  vaultRootPath,
+  locale = 'en',
+}: {
+  researchLabMode?: ResearchLabModeConfig | null
+  selection: SidebarSelection
+  onSelect: (selection: SidebarSelection) => void
+  collapsed: boolean
+  onToggle: () => void
+  vaultRootPath?: string
+  locale?: AppLocale
+}) {
+  if (researchLabMode?.enabled !== true) return null
+
+  return (
+    <div className="border-b border-border" data-testid="research-lab-sidebar-section">
+      <div style={{ padding: '0 6px' }}>
+        <SidebarGroupHeader label={translate(locale, 'sidebar.nav.labHome')} collapsed={collapsed} onToggle={onToggle} />
+      </div>
+      {!collapsed && (
+        <div className="space-y-1" style={{ padding: '0 6px 4px 22px' }}>
+          {LAB_HOME_SECTION_ITEMS.map((item) => {
+            const path = normalizeVaultRelativePath(researchLabMode.folders[item.key])
+            if (!path) return null
+
+            const target: SidebarSelection = vaultRootPath
+              ? { kind: 'folder', path, rootPath: vaultRootPath }
+              : { kind: 'folder', path }
+
+            return (
+              <div key={item.id} data-testid={`research-lab-sidebar-item-${item.id}`}>
+                <NavItem
+                  icon={item.icon}
+                  label={translate(locale, item.labelKey)}
+                  isActive={isSelectionActive(selection, target)}
+                  onClick={() => onSelect(target)}
+                  compact
+                />
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

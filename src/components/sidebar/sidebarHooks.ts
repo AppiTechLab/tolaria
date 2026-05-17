@@ -10,7 +10,7 @@ import { countAllNotesByFilter } from '../../utils/noteListHelpers'
 import { buildDynamicSections, sortSections } from '../../utils/sidebarSections'
 import type { AllNotesFileVisibility } from '../../utils/allNotesFileVisibility'
 
-export type SidebarGroupKey = 'favorites' | 'views' | 'sections' | 'folders'
+export type SidebarGroupKey = 'labHome' | 'favorites' | 'views' | 'sections' | 'folders'
 
 export interface SidebarMenuPosition {
   x: number
@@ -171,14 +171,22 @@ export function useSidebarSections(entries: VaultEntry[], pluralizeTypeLabels = 
   return { typeEntryMap, allSectionGroups, visibleSections, sectionIds }
 }
 
+const DEFAULT_COLLAPSED_STATE: Record<SidebarGroupKey, boolean> = {
+  labHome: false,
+  favorites: false,
+  views: false,
+  sections: false,
+  folders: false,
+}
+
 function loadCollapsedState(): Record<SidebarGroupKey, boolean> {
   try {
     const raw = getAppStorageItem('sidebarCollapsed')
-    if (raw) return JSON.parse(raw)
+    if (raw) return { ...DEFAULT_COLLAPSED_STATE, ...JSON.parse(raw) }
   } catch {
     // Ignore localStorage failures and fall back to defaults.
   }
-  return { favorites: false, views: false, sections: false, folders: false }
+  return { ...DEFAULT_COLLAPSED_STATE }
 }
 
 export function useSidebarCollapsed() {

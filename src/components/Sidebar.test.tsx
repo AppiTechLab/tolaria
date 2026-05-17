@@ -216,6 +216,19 @@ const mockEntries: VaultEntry[] = [
 ]
 
 const defaultSelection: SidebarSelection = { kind: 'filter', filter: 'all' }
+const researchLabMode: NonNullable<ComponentProps<typeof Sidebar>['researchLabMode']> = {
+  enabled: true,
+  folders: {
+    ongoingProjects: 'Projects/Ongoing',
+    projectAcquisition: 'Projects/Acquisition',
+    teaching: 'Teaching',
+    labManagement: 'Lab Management',
+    templates: 'Templates',
+    views: 'views',
+    aiPrompts: 'AI Prompts',
+    archive: 'Archive',
+  },
+}
 
 describe('Sidebar', () => {
   it('renders top nav items (All Notes)', () => {
@@ -974,32 +987,50 @@ describe('Sidebar', () => {
     expect(mondaySections).toHaveLength(1)
   })
 
-  it('renders Lab Home as the first item in the top nav', () => {
+  it('renders Inbox as the first item in the default top nav', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} inboxCount={5} />)
     const topNav = screen.getByTestId('sidebar-top-nav')
     const items = topNav.children
-    expect(items[0].textContent).toContain('Lab Home')
+    expect(items[0].textContent).toContain('Inbox')
     expect(items[1].textContent).toContain('All Notes')
   })
 
   it('displays all notes count badge', () => {
-    render(<Sidebar entries={mockEntries} selection={{ kind: 'filter', filter: 'labHome' }} onSelect={() => {}} inboxCount={12} />)
+    render(<Sidebar entries={mockEntries} selection={defaultSelection} onSelect={() => {}} inboxCount={12} />)
     const allNotesItem = screen.getByText('All Notes').closest('[class*="cursor-pointer"]') as HTMLElement
     expect(within(allNotesItem).getByTestId('sidebar-count-chip')).toBeInTheDocument()
   })
 
-  it('calls onSelect with lab home filter when clicking Lab Home', () => {
-    const onSelect = vi.fn()
-    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={onSelect} inboxCount={3} />)
-    fireEvent.click(screen.getByText('Lab Home'))
-    expect(onSelect).toHaveBeenCalledWith({ kind: 'filter', filter: 'labHome' })
+  it('renders Lab Home as a collapsible section in research lab mode', () => {
+    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} showInbox researchLabMode={researchLabMode} vaultRootPath="/vault" inboxCount={3} />)
+
+    const topNav = screen.getByTestId('sidebar-top-nav')
+    expect(within(topNav).queryByText('Lab Home')).not.toBeInTheDocument()
+    expect(within(topNav).queryByText('Inbox')).not.toBeInTheDocument()
+
+    expect(screen.getByTestId('research-lab-sidebar-section')).toBeInTheDocument()
+    expect(screen.getByText('Lab Home')).toBeInTheDocument()
+    expect(screen.getByText('Ongoing Projects')).toBeInTheDocument()
+    expect(screen.getByText('Project Acquisition')).toBeInTheDocument()
+    expect(screen.getByText('Teaching')).toBeInTheDocument()
+    expect(screen.getByText('Lab Management')).toBeInTheDocument()
   })
 
-  it('keeps Lab Home visible when explicit organization is disabled', () => {
-    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} showInbox={false} inboxCount={3} />)
-    expect(screen.queryByText('Inbox')).not.toBeInTheDocument()
-    const topNav = screen.getByTestId('sidebar-top-nav')
-    expect(topNav.children[0].textContent).toContain('Lab Home')
+  it('calls onSelect with the mapped folder when clicking a Lab Home child entry', () => {
+    const onSelect = vi.fn()
+    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={onSelect} researchLabMode={researchLabMode} vaultRootPath="/vault" />)
+
+    fireEvent.click(screen.getByText('Teaching'))
+
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'folder', path: 'Teaching', rootPath: '/vault' })
+  })
+
+  it('preserves the default top nav when research lab mode is disabled', () => {
+    render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} showInbox inboxCount={3} />)
+
+    expect(screen.getByText('Inbox')).toBeInTheDocument()
+    expect(screen.queryByTestId('research-lab-sidebar-section')).not.toBeInTheDocument()
+    expect(screen.queryByText('Lab Home')).not.toBeInTheDocument()
   })
 
   it('excludes attachments-folder markdown from top-nav note totals', () => {

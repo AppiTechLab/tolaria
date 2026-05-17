@@ -1,6 +1,6 @@
 import { useCallback, memo } from 'react'
 import type {
-  VaultEntry, FolderNode, SidebarSelection, ViewDefinition, ViewFile,
+  VaultEntry, FolderNode, ResearchLabModeConfig, SidebarSelection, ViewDefinition, ViewFile,
 } from '../types'
 import {
   KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent,
@@ -17,6 +17,7 @@ import {
   ContextMenuOverlay,
   CustomizeOverlay,
   FavoritesSection,
+  ResearchLabHomeSection,
   type SidebarSectionProps,
   SidebarTitleBar,
   SidebarTopNav,
@@ -65,6 +66,7 @@ interface SidebarProps {
   vaultRootPath?: string
   showInbox?: boolean
   inboxCount?: number
+  researchLabMode?: ResearchLabModeConfig | null
   allNotesFileVisibility?: AllNotesFileVisibility
   pluralizeTypeLabels?: boolean
   locale?: AppLocale
@@ -102,6 +104,7 @@ interface SidebarNavigationProps extends Pick<
   | 'vaultRootPath'
   | 'showInbox'
   | 'inboxCount'
+  | 'researchLabMode'
   | 'onCreateNewType'
   | 'locale'
   | 'loading'
@@ -372,6 +375,15 @@ function SidebarFoldersNavigation({
 function SidebarTopNavigation(props: SidebarNavigationProps) {
   return (
     <>
+      <ResearchLabHomeSection
+        researchLabMode={props.researchLabMode}
+        selection={props.selection}
+        onSelect={props.onSelect}
+        collapsed={props.groupCollapsed.labHome}
+        onToggle={() => props.toggleGroup('labHome')}
+        vaultRootPath={props.vaultRootPath}
+        locale={props.locale ?? 'en'}
+      />
       <SidebarTopNav
         selection={props.selection}
         onSelect={props.onSelect}
@@ -379,6 +391,7 @@ function SidebarTopNavigation(props: SidebarNavigationProps) {
         inboxCount={props.inboxCount ?? 0}
         activeCount={props.activeCount}
         archivedCount={props.archivedCount}
+        researchLabModeEnabled={props.researchLabMode?.enabled === true}
         locale={props.locale ?? 'en'}
         loading={props.loading ?? false}
       />
@@ -585,6 +598,7 @@ function SidebarRuntimeNavigation({
       vaultRootPath={props.vaultRootPath}
       showInbox={props.showInbox}
       inboxCount={props.inboxCount}
+      researchLabMode={props.researchLabMode}
       locale={props.locale}
       loading={props.loading}
       onCreateNewType={props.onCreateNewType}
