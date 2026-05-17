@@ -626,7 +626,9 @@ describe('App', () => {
 
     expect(await screen.findByTestId('sidebar-loading-favorites', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByTestId('vault-loading-skeleton')).not.toBeInTheDocument()
-    expect(screen.getByTestId('sidebar-top-nav')).toHaveTextContent('Lab Home')
+    expect(screen.getByTestId('sidebar-top-nav')).toHaveTextContent('Inbox')
+    expect(screen.getByTestId('sidebar-top-nav')).toHaveTextContent('All Notes')
+    expect(screen.getByTestId('sidebar-top-nav')).toHaveTextContent('Archive')
     expect(screen.getByTestId('sidebar-loading-views')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-loading-types')).toBeInTheDocument()
     expect(screen.getByTestId('sidebar-loading-folders')).toBeInTheDocument()
@@ -1239,26 +1241,20 @@ describe('App', () => {
     })
   }, 10_000)
 
-  it('lands on Lab Home by default when explicit organization is enabled', async () => {
+  it('lands on All Notes by default when explicit organization is enabled', async () => {
     render(<App />)
 
     await waitFor(() => {
-      expect(screen.getByTestId('lab-home-view')).toHaveTextContent('Lab Home')
-      expect(screen.getByRole('heading', { name: 'Ongoing Projects' })).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Project Acquisition' })).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Teaching' })).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Lab Management' })).toBeInTheDocument()
-      expect(screen.getByText('No active project data loaded yet.')).toBeInTheDocument()
-      expect(screen.getByText('No proposal pipeline data loaded yet.')).toBeInTheDocument()
-      expect(screen.getByText('No teaching data loaded yet.')).toBeInTheDocument()
-      expect(screen.getByText('No lab management data loaded yet.')).toBeInTheDocument()
+      expect(screen.getByTestId('note-list-container')).toBeInTheDocument()
+      expect(screen.queryByTestId('lab-home-view')).not.toBeInTheDocument()
+      expect(screen.getByTestId('sidebar-top-nav')).toHaveTextContent('Inbox')
+      expect(screen.getByTestId('sidebar-top-nav')).toHaveTextContent('All Notes')
     })
 
-    expect(screen.queryByTestId('note-list-container')).not.toBeInTheDocument()
-    expect(within(screen.getByTestId('sidebar-top-nav')).queryByText('Inbox')).not.toBeInTheDocument()
+    expect(screen.queryByText('Lab Home')).not.toBeInTheDocument()
   })
 
-  it('reopens the Lab Home dashboard when clicking the sidebar item', async () => {
+  it('opens Inbox when clicking the sidebar item', async () => {
     render(<App />)
 
     const topNav = await screen.findByTestId('sidebar-top-nav')
@@ -1273,13 +1269,13 @@ describe('App', () => {
     })
 
     await act(async () => {
-      fireEvent.click(within(topNav).getByText('Lab Home'))
+      fireEvent.click(within(topNav).getByText('Inbox'))
       await Promise.resolve()
     })
 
     await waitFor(() => {
-      expect(screen.getByTestId('lab-home-view')).toBeInTheDocument()
-      expect(screen.queryByTestId('note-list-container')).not.toBeInTheDocument()
+      expect(screen.getByTestId('note-list-container')).toBeInTheDocument()
+      expect(screen.queryByTestId('lab-home-view')).not.toBeInTheDocument()
     })
   })
 
