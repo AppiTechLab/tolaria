@@ -319,19 +319,32 @@ function isMissingNotePathError(error: unknown): boolean {
 function shouldApplyLoadedEntry(options: {
   seq: number
   path: string
+  content: string
+  forceReload: boolean
   latestLoadSeqByPathRef: React.MutableRefObject<Map<string, number>>
   pendingOpenPathsRef: React.MutableRefObject<Set<string>>
   tabsRef: React.MutableRefObject<Tab[]>
+  activeTabPathRef: React.MutableRefObject<string | null>
 }) {
   const {
     seq,
     path,
+    content,
+    forceReload,
     latestLoadSeqByPathRef,
     pendingOpenPathsRef,
     tabsRef,
+    activeTabPathRef,
   } = options
 
   if (latestLoadSeqByPathRef.current.get(path) !== seq) return false
+  if (forceReload) return true
+
+  const openTab = findMatchingTab(tabsRef.current, path)
+  if (notePathsMatch(activeTabPathRef.current, path) && openTab?.content === content) {
+    return false
+  }
+
   return pendingOpenPathsRef.current.has(path) || !!findMatchingTab(tabsRef.current, path)
 }
 
@@ -633,9 +646,12 @@ async function loadTextEntry(options: Required<Pick<NavigateToEntryOptions, 'for
     if (!shouldApplyLoadedEntry({
       seq,
       path: entry.path,
+      content,
+      forceReload,
       latestLoadSeqByPathRef,
       pendingOpenPathsRef,
       tabsRef,
+      activeTabPathRef,
     })) {
       return
     }

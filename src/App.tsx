@@ -772,7 +772,7 @@ function App() {
         entry.path,
         workspace,
         sourceVaultPath,
-        (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }, _newContent: string) => {
+        (oldPath: string, newEntry: Partial<VaultEntry> & { path: string }) => {
           appSave.trackRenamedPath(oldPath, newEntry.path)
           vault.replaceEntry(oldPath, newEntry)
           if (effectiveSelection.kind === 'entity' && effectiveSelection.entry.path === oldPath) {
