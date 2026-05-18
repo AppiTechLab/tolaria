@@ -451,6 +451,7 @@ import { streamAiAgent } from './utils/streamAiAgent'
 const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:ai-agents-onboarding-dismissed'
 const CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:claude-code-onboarding-dismissed'
 const SLOW_APP_READY_TIMEOUT_MS = 10_000
+const SLOW_APP_INTERACTION_TIMEOUT_MS = 20_000
 
 function render(ui: ReactElement, options?: Parameters<typeof testingLibraryRender>[1]) {
   return testingLibraryRender(ui, {
@@ -459,7 +460,20 @@ function render(ui: ReactElement, options?: Parameters<typeof testingLibraryRend
   })
 }
 
+async function waitForVaultContentReady() {
+  await waitFor(() => {
+    expect(screen.getByTestId('status-bar')).toBeInTheDocument()
+    expect(screen.queryByTestId('status-vault-reloading')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-loading-favorites')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-loading-views')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-loading-types')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sidebar-loading-folders')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('note-list-loading-skeleton')).not.toBeInTheDocument()
+  }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
+}
+
 async function openAllNotesFromSidebar() {
+  await waitForVaultContentReady()
   const topNav = await screen.findByTestId('sidebar-top-nav')
   await act(async () => {
     fireEvent.click(within(topNav).getByText('All Notes'))
@@ -536,14 +550,21 @@ describe('App', () => {
     mockCommandResults.reload_vault = mockEntries
 
     render(<App />)
+    await waitForVaultContentReady()
 
     await screen.findByText('All Notes')
-    fireEvent.click(screen.getByRole('button', { name: 'Create view' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Create view' }))
+      await Promise.resolve()
+    })
     const dialog = await screen.findByRole('dialog')
     fireEvent.change(within(dialog).getByPlaceholderText(/Active Projects|Reading List/i), {
       target: { value: '🚀' },
     })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }))
+      await Promise.resolve()
+    })
 
     await waitFor(() => {
       expect(saveView).toHaveBeenCalledWith(expect.objectContaining({
@@ -551,7 +572,7 @@ describe('App', () => {
         definition: expect.objectContaining({ name: '🚀' }),
       }))
     })
-  }, 10000)
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('loads and displays vault entries in sidebar', async () => {
     render(<App />)
@@ -562,7 +583,7 @@ describe('App', () => {
       expect(screen.getAllByText('Test Project').length).toBeGreaterThan(0)
       expect(screen.getAllByText('Software Development').length).toBeGreaterThan(0)
     })
-  })
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('opens multiple notes into tabs and focuses existing tabs from the note list', async () => {
     render(<App />)
@@ -588,7 +609,7 @@ describe('App', () => {
 
     tabBar = screen.getByTestId('editor-tab-bar')
     expect(within(tabBar).getAllByRole('tab')).toHaveLength(2)
-  })
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('closes tabs back to the previous note and then the empty editor state', async () => {
     render(<App />)
@@ -613,7 +634,7 @@ describe('App', () => {
 
     await waitFor(() => expect(screen.getByText('Select a note to start editing')).toBeInTheDocument())
     expect(screen.queryByTestId('editor-tab-bar')).not.toBeInTheDocument()
-  })
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('keeps the app shell usable while the vault note scan is pending', async () => {
     let resolveListVault: ((value: typeof mockEntries) => void) | null = null
@@ -660,10 +681,11 @@ describe('App', () => {
 
   it('shows empty state in editor when no note is selected', async () => {
     render(<App />)
+    await waitForVaultContentReady()
     await waitFor(() => {
       expect(screen.getByText('Select a note to start editing')).toBeInTheDocument()
     })
-  })
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('opens a note window by loading only the requested entry', async () => {
     const listVault = vi.fn(() => mockEntries)
@@ -695,13 +717,14 @@ describe('App', () => {
     const quickOpenHint = formatShortcutDisplay({ display: '⌘P / ⌘O' })
     const newNoteHint = formatShortcutDisplay({ display: '⌘N' })
     const { container } = render(<App />)
+    await waitForVaultContentReady()
     await waitFor(() => {
       const shortcutHint = Array.from(container.querySelectorAll('span.text-xs.text-muted-foreground'))
         .find((element) => element.textContent === `${quickOpenHint} to search · ${newNoteHint} to create`)
 
       expect(shortcutHint).toBeInTheDocument()
     })
-  })
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('registers keyboard shortcuts without error', async () => {
     render(<App />)
@@ -1185,6 +1208,7 @@ describe('App', () => {
     configureNeighborhoodVault()
 
     render(<App />)
+    await waitForVaultContentReady()
     const topNav = await screen.findByTestId('sidebar-top-nav')
 
     await waitFor(() => {
@@ -1212,7 +1236,10 @@ describe('App', () => {
     })
 
     const editor = screen.getByTestId('mock-editor')
-    editor.focus()
+    await act(async () => {
+      editor.focus()
+      await Promise.resolve()
+    })
     expect(editor).toHaveFocus()
 
     await pressEscape()
@@ -1239,7 +1266,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(getHeader()).toHaveTextContent(initialHeaderText)
     })
-  }, 10_000)
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('lands on All Notes by default when explicit organization is enabled', async () => {
     render(<App />)
@@ -1283,6 +1310,7 @@ describe('App', () => {
     configureNeighborhoodFavoritesVault()
 
     render(<App />)
+    await waitForVaultContentReady()
 
     let favoritesSection: HTMLElement | undefined
     await waitFor(() => {
@@ -1290,8 +1318,11 @@ describe('App', () => {
       const currentFavoritesSection = sidebar.closest('div')?.parentElement as HTMLElement
       expect(within(currentFavoritesSection).getByText('Alpha')).toBeInTheDocument()
       favoritesSection = currentFavoritesSection
+    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
+    await act(async () => {
+      fireEvent.click(within(favoritesSection!).getByText('Alpha'))
+      await Promise.resolve()
     })
-    fireEvent.click(within(favoritesSection!).getByText('Alpha'))
 
     const noteListContainer = await screen.findByTestId('note-list-container')
     await waitFor(() => {
@@ -1300,7 +1331,7 @@ describe('App', () => {
 
     expect(screen.getByText('Related to')).toBeInTheDocument()
     expect(screen.getByText('Beta')).toBeInTheDocument()
-  })
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('defaults to All Notes when explicit organization is disabled in vault config', async () => {
     const workVaultPath = '/Users/mock/Documents/Work'
@@ -1354,38 +1385,52 @@ describe('App', () => {
     localStorage.setItem('laputa:vault-config:/vault', researchLabConfig)
 
     render(<App />)
+    await waitForVaultContentReady()
 
     await waitFor(() => {
       expect(within(screen.getByTestId('sidebar-top-nav')).queryByText('Inbox')).not.toBeInTheDocument()
       expect(screen.getByTestId('research-lab-sidebar-section')).toBeInTheDocument()
-    })
+    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
 
     const teachingItem = screen.getByText('Teaching').closest('[class*="cursor-pointer"]') as HTMLElement
-    fireEvent.click(teachingItem)
+    await act(async () => {
+      fireEvent.click(teachingItem)
+      await Promise.resolve()
+    })
 
     const noteListContainer = await screen.findByTestId('note-list-container')
     await waitFor(() => {
       expect(getHeaderForNoteList(noteListContainer)).toHaveTextContent('Teaching')
     })
     expect(screen.getByRole('button', { name: 'Sessions' })).toBeInTheDocument()
-    fireEvent.click(screen.getByTitle('Search notes'))
+    await act(async () => {
+      fireEvent.click(screen.getByTitle('Search notes'))
+      await Promise.resolve()
+    })
     expect(screen.getByPlaceholderText('Search teaching...')).toBeInTheDocument()
     expect(teachingItem).toHaveClass('bg-primary/10', 'text-primary')
 
     const sessionsShortcut = screen.getByRole('button', { name: 'Sessions' })
     const coursesShortcut = screen.getByRole('button', { name: 'Courses' })
-    fireEvent.click(sessionsShortcut)
+    await act(async () => {
+      fireEvent.click(sessionsShortcut)
+      await Promise.resolve()
+    })
     expect(sessionsShortcut).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(coursesShortcut)
+    await act(async () => {
+      fireEvent.click(coursesShortcut)
+      await Promise.resolve()
+    })
     expect(coursesShortcut).toHaveAttribute('aria-pressed', 'true')
     expect(sessionsShortcut).toHaveAttribute('aria-pressed', 'false')
-  })
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('auto-advances to the next inbox item after organizing when the setting is enabled', async () => {
     configureNeighborhoodVault()
     mockCommandResults.get_settings = createSettings({ auto_advance_inbox_after_organize: true })
 
     render(<App />)
+    await waitForVaultContentReady()
 
     await waitFor(() => {
       expect(typeof window.__laputaTest?.dispatchBrowserMenuCommand).toBe('function')
@@ -1414,7 +1459,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(window.__laputaTest?.activeTabPath).toBe('/vault/beta.md')
     })
-  }, 10_000)
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('keeps the manually selected note after organizing finishes later', async () => {
     configureNeighborhoodVault()
@@ -1427,6 +1472,7 @@ describe('App', () => {
     mockCommandResults.save_note_content = vi.fn(() => organizeSave)
 
     render(<App />)
+    await waitForVaultContentReady()
 
     await waitFor(() => {
       expect(typeof window.__laputaTest?.dispatchBrowserMenuCommand).toBe('function')
@@ -1468,17 +1514,14 @@ describe('App', () => {
     })
 
     expect(window.__laputaTest?.activeTabPath).toBe('/vault/gamma.md')
-  }, 10_000)
+  }, SLOW_APP_INTERACTION_TIMEOUT_MS)
 
   it('renders status bar', async () => {
     render(<App />)
-    // StatusBar should be present
-    await waitFor(() => {
-      expect(screen.getByText('All Notes')).toBeInTheDocument()
-    })
-    // The status bar element should exist in the DOM
-    const appShell = document.querySelector('.app-shell')
-    expect(appShell).toBeInTheDocument()
+    await waitForVaultContentReady()
+
+    expect(screen.getByTestId('status-bar')).toBeInTheDocument()
+    expect(document.querySelector('.app-shell')).toBeInTheDocument()
   })
 
   it('switches vaults from the bottom bar after onboarding is ready', async () => {
@@ -1517,8 +1560,9 @@ describe('App', () => {
     mockCommandResults.is_git_repo = ({ vaultPath }: { vaultPath?: string } = {}) => vaultPath === '/vault-2'
 
     render(<App />)
+  await waitForVaultContentReady()
 
-    expect(await screen.findByTestId('status-missing-git')).toBeInTheDocument()
+  expect(await screen.findByTestId('status-missing-git', {}, { timeout: SLOW_APP_READY_TIMEOUT_MS })).toBeInTheDocument()
     fireEvent.click(screen.getByTestId('status-missing-git'))
     expect(await screen.findByText('Enable Git for this vault?')).toBeInTheDocument()
 

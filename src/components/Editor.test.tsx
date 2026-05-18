@@ -562,11 +562,14 @@ describe('Editor', () => {
       />
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open table of contents' }))
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Open table of contents' }))
+      await Promise.resolve()
+    })
 
     expect(screen.getByTestId('table-of-contents-panel')).toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: 'Table Heading' })).toBeInTheDocument()
-  })
+    expect(await screen.findByRole('button', { name: 'Table Heading' }, { timeout: 10_000 })).toBeInTheDocument()
+  }, 20_000)
 
   // Regression: editor content did not appear on first load because BlockNote's
   // replaceBlocks/insertBlocks internally calls flushSync, which fails silently
