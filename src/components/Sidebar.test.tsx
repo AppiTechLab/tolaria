@@ -1025,6 +1025,31 @@ describe('Sidebar', () => {
     expect(onSelect).toHaveBeenCalledWith({ kind: 'folder', path: 'Teaching', rootPath: '/vault' })
   })
 
+  it('renders custom Lab Home groups and hides disabled built-in ones', () => {
+    const onSelect = vi.fn()
+
+    render(
+      <Sidebar
+        entries={[]}
+        selection={defaultSelection}
+        onSelect={onSelect}
+        researchLabMode={{
+          ...researchLabMode,
+          hiddenSidebarGroups: ['teaching'],
+          customSidebarGroups: [{ id: 'custom-1', label: 'Grant Pipeline', folderPath: 'Projects/Grants' }],
+        }}
+        vaultRootPath="/vault"
+      />,
+    )
+
+    expect(screen.queryByText('Teaching')).not.toBeInTheDocument()
+    expect(screen.getByText('Grant Pipeline')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Grant Pipeline'))
+
+    expect(onSelect).toHaveBeenCalledWith({ kind: 'folder', path: 'Projects/Grants', rootPath: '/vault' })
+  })
+
   it('applies a distinct accent color to each Lab Home child entry', () => {
     render(<Sidebar entries={[]} selection={defaultSelection} onSelect={() => {}} researchLabMode={researchLabMode} vaultRootPath="/vault" />)
 

@@ -1,11 +1,27 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { CreateViewDialog } from './CreateViewDialog'
-import type { ViewDefinition } from '../types'
+import type { ResearchLabModeConfig, ViewDefinition } from '../types'
 
 const DIALOG_TEST_TIMEOUT_MS = 10_000
 
 describe('CreateViewDialog', () => {
+  const researchLabMode: ResearchLabModeConfig = {
+    enabled: true,
+    folders: {
+      ongoingProjects: 'Projects/Ongoing',
+      projectAcquisition: 'Projects/Acquisition',
+      teaching: 'Teaching',
+      labManagement: 'Lab Management',
+      templates: 'Templates',
+      views: 'views',
+      aiPrompts: 'AI Prompts',
+      archive: 'Archive',
+    },
+    hiddenSidebarGroups: [],
+    customSidebarGroups: [],
+  }
+
   const defaultProps = {
     open: true,
     onClose: vi.fn(),
@@ -71,7 +87,7 @@ describe('CreateViewDialog', () => {
       <CreateViewDialog
         {...defaultProps}
         onCreate={onCreate}
-        researchLabModeEnabled
+        researchLabMode={researchLabMode}
         editingView={makeEditingView()}
       />,
     )
@@ -85,6 +101,33 @@ describe('CreateViewDialog', () => {
     await waitFor(() => {
       expect(onCreate).toHaveBeenCalledWith(
         expect.objectContaining({ labHomeGroup: 'teaching' }),
+      )
+    })
+  })
+
+  it('allows assigning a saved view to a custom Lab Home group', async () => {
+    const onCreate = vi.fn()
+    render(
+      <CreateViewDialog
+        {...defaultProps}
+        onCreate={onCreate}
+        researchLabMode={{
+          ...researchLabMode,
+          customSidebarGroups: [{ id: 'custom-1', label: 'Grant Pipeline', folderPath: 'Projects/Grants' }],
+        }}
+        editingView={makeEditingView()}
+      />,
+    )
+
+    const trigger = screen.getByTestId('view-dialog-lab-home-group')
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown', code: 'ArrowDown' })
+    fireEvent.click(screen.getByRole('option', { name: 'Grant Pipeline' }))
+    fireEvent.submit(screen.getByText('Save').closest('form')!)
+
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ labHomeGroup: 'custom-1' }),
       )
     })
   })

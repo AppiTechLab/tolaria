@@ -87,10 +87,14 @@ function renderManagedViewNoteList({
 
 function renderManagedWorkspaceViewNoteList({
   selectedLabDomain,
+  selectedLabHomeGroupId,
+  folderPath,
   entries = [],
   views = [],
 }: {
-  selectedLabDomain: ResearchLabDomainKey
+  selectedLabDomain?: ResearchLabDomainKey | null
+  selectedLabHomeGroupId?: string
+  folderPath?: string
   entries?: Parameters<typeof renderNoteList>[0]['entries']
   views?: ViewFile[]
 }) {
@@ -100,6 +104,11 @@ function renderManagedWorkspaceViewNoteList({
     teaching: 'Teaching',
     labManagement: 'Lab Management',
   }
+  const resolvedFolderPath = folderPath ?? (selectedLabDomain ? folderPathByDomain[selectedLabDomain] : null)
+
+  if (!resolvedFolderPath) {
+    throw new Error('renderManagedWorkspaceViewNoteList requires either selectedLabDomain or folderPath')
+  }
 
   function ManagedWorkspaceViewNoteList() {
     const [selectedWorkspaceView, setSelectedWorkspaceView] = useState<SelectedWorkspaceView | null>(null)
@@ -108,9 +117,10 @@ function renderManagedWorkspaceViewNoteList({
       <NoteList
         {...buildNoteListProps({
           entries,
-          selection: { kind: 'folder', path: folderPathByDomain[selectedLabDomain] },
+          selection: { kind: 'folder', path: resolvedFolderPath },
           views,
-          selectedLabDomain,
+          selectedLabDomain: selectedLabDomain ?? undefined,
+          selectedLabHomeGroupId: selectedLabHomeGroupId ?? selectedLabDomain ?? undefined,
           selectedWorkspaceView,
           onSelectWorkspaceView: setSelectedWorkspaceView,
           researchLabModeEnabled: true,
@@ -285,6 +295,44 @@ describe('NoteList rendering', () => {
 
     expect(screen.getByText('Project Phoenix')).toBeInTheDocument()
     expect(screen.queryByText('Decision Log')).not.toBeInTheDocument()
+  })
+
+  it('uses assigned saved views for custom Lab Home groups when available', () => {
+    renderManagedWorkspaceViewNoteList({
+      folderPath: 'Projects/Grants',
+      entries: [
+        makeEntry({
+          path: '/vault/Projects/Grants/proposal-draft.md',
+          filename: 'proposal-draft.md',
+          title: 'Proposal Draft',
+          isA: 'Proposal',
+        }),
+        makeEntry({
+          path: '/vault/Projects/Grants/team-notes.md',
+          filename: 'team-notes.md',
+          title: 'Team Notes',
+          isA: 'Note',
+        }),
+      ],
+      selectedLabHomeGroupId: 'custom-1',
+      views: [
+        makeViewDefinition({
+          filename: 'grant-pipeline.yml',
+          definition: {
+            name: 'Grant Pipeline',
+            labHomeGroup: 'custom-1',
+            filters: { all: [{ field: 'type', op: 'equals', value: 'Proposal' }] },
+          },
+        }),
+      ],
+    })
+
+    expect(screen.getByRole('button', { name: 'Grant Pipeline' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Grant Pipeline' }))
+
+    expect(screen.getByText('Proposal Draft')).toBeInTheDocument()
+    expect(screen.queryByText('Team Notes')).not.toBeInTheDocument()
   })
 
   it('filters workspace entries by explicit workspace-view frontmatter when selecting a shortcut', () => {

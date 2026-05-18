@@ -1,12 +1,18 @@
 import type { TranslationKey, TranslationValues } from '../lib/i18n'
-import type { FolderNode, ResearchLabFolderKey, ResearchLabModeConfig } from '../types'
+import type {
+  FolderNode,
+  ResearchLabCustomSidebarGroup,
+  ResearchLabDomainKey,
+  ResearchLabFolderKey,
+  ResearchLabModeConfig,
+} from '../types'
 import {
   RESEARCH_LAB_OPERATIONAL_KEYS,
   RESEARCH_LAB_SYSTEM_KEYS,
   type ResearchLabValidationIssue,
   type ResearchLabValidationResult,
 } from '../utils/researchLabMode'
-import { normalizeVaultRelativePath } from '../utils/notePathIdentity'
+import { normalizeVaultRelativePath, vaultRelativePathLabel } from '../utils/notePathIdentity'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
 import {
@@ -101,6 +107,36 @@ function fieldIssueClass(issue: ResearchLabValidationIssue): string {
     : 'text-destructive'
 }
 
+function setBuiltInSidebarGroupVisibility(
+  config: ResearchLabModeConfig,
+  field: ResearchLabDomainKey,
+  visible: boolean,
+): ResearchLabModeConfig {
+  const hidden = new Set(config.hiddenSidebarGroups ?? [])
+
+  if (visible) hidden.delete(field)
+  else hidden.add(field)
+
+  return {
+    ...config,
+    hiddenSidebarGroups: (RESEARCH_LAB_OPERATIONAL_KEYS as readonly ResearchLabDomainKey[])
+      .filter((key) => hidden.has(key)),
+  }
+}
+
+function nextCustomSidebarGroupId(groups: readonly ResearchLabCustomSidebarGroup[]): string {
+  const usedIds = new Set(groups.map((group) => group.id))
+  let nextId = 1
+  while (usedIds.has(`custom-${nextId}`)) nextId += 1
+  return `custom-${nextId}`
+}
+
+function customSidebarGroupLabel(group: ResearchLabCustomSidebarGroup): string {
+  const label = typeof group.label === 'string' ? group.label.trim() : ''
+  if (label) return label
+  return vaultRelativePathLabel(group.folderPath)
+}
+
 function ResearchLabFolderField({
   config,
   field,
@@ -172,6 +208,85 @@ function ResearchLabFolderField({
   )
 }
 
+function ResearchLabCustomSidebarGroupField({
+  config,
+  folderPaths,
+  group,
+  index,
+  onChange,
+  t,
+}: {
+  config: ResearchLabModeConfig
+  folderPaths: string[]
+  group: ResearchLabCustomSidebarGroup
+  index: number
+  onChange: (config: ResearchLabModeConfig) => void
+  t: Translate
+}) {
+  const resolvedLabel = customSidebarGroupLabel(group) || t('sidebar.nav.labHome')
+
+  const updateGroup = (patch: Partial<ResearchLabCustomSidebarGroup>) => {
+    const nextGroups = [...(config.customSidebarGroups ?? [])]
+    nextGroups[index] = {
+      ...nextGroups[index],
+      ...patch,
+    }
+
+    onChange({
+      ...config,
+      customSidebarGroups: nextGroups,
+    })
+  }
+
+  const removeGroup = () => {
+    onChange({
+      ...config,
+      customSidebarGroups: (config.customSidebarGroups ?? []).filter((_, groupIndex) => groupIndex !== index),
+    })
+  }
+
+  return (
+    <SettingsGroupItem testId={`settings-research-lab-custom-sidebar-${index}`}>
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,0.75fr)_auto]">
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-medium text-muted-foreground" htmlFor={`settings-research-lab-custom-sidebar-${group.id}-label`}>
+            {t('settings.workspaces.label')}
+          </label>
+          <Input
+            id={`settings-research-lab-custom-sidebar-${group.id}-label`}
+            value={group.label ?? ''}
+            onChange={(event) => updateGroup({ label: event.target.value })}
+            data-testid={`settings-research-lab-custom-sidebar-${index}-label`}
+            placeholder={vaultRelativePathLabel(group.folderPath)}
+            className="bg-transparent"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <div className="text-[11px] font-medium text-muted-foreground">{t('settings.researchLabMode.pickExisting')}</div>
+          <SelectControl
+            value={normalizeVaultRelativePath(group.folderPath) || group.folderPath || folderPaths[0] || ''}
+            onValueChange={(value) => updateGroup({ folderPath: value })}
+            options={buildFolderOptions(group.folderPath, folderPaths)}
+            testId={`settings-research-lab-custom-sidebar-${index}-path`}
+            ariaLabel={t('settings.researchLabMode.pickExistingAria', { label: resolvedLabel })}
+          />
+        </div>
+        <div className="flex items-end justify-end">
+          <Button
+            type="button"
+            size="xs"
+            variant="ghost"
+            data-testid={`settings-research-lab-custom-sidebar-${index}-remove`}
+            onClick={removeGroup}
+          >
+            {t('common.remove')}
+          </Button>
+        </div>
+      </div>
+    </SettingsGroupItem>
+  )
+}
+
 export function ResearchLabModeSettingsSection({
   t,
   config,
@@ -183,6 +298,24 @@ export function ResearchLabModeSettingsSection({
 }: ResearchLabModeSettingsSectionProps) {
   const folderPaths = flattenFolderPaths(folders).sort((left, right) => left.localeCompare(right))
   const summary = validationSummary(t, validation)
+  const customSidebarGroups = config.customSidebarGroups ?? []
+
+  const addCustomSidebarGroup = () => {
+    const defaultFolderPath = folderPaths[0]
+    if (!defaultFolderPath) return
+
+    onChange({
+      ...config,
+      customSidebarGroups: [
+        ...customSidebarGroups,
+        {
+          id: nextCustomSidebarGroupId(customSidebarGroups),
+          label: null,
+          folderPath: defaultFolderPath,
+        },
+      ],
+    })
+  }
 
   return (
     <>
@@ -244,6 +377,42 @@ export function ResearchLabModeSettingsSection({
                 field={field}
                 folderPaths={folderPaths}
                 issues={validationIssuesForField(field, validation)}
+                onChange={onChange}
+                t={t}
+              />
+            ))}
+            <SettingsGroupItem testId="settings-research-lab-sidebar-groups">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="text-sm font-medium text-foreground">{t('sidebar.nav.labHome')}</div>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="secondary"
+                  data-testid="settings-research-lab-custom-sidebar-add"
+                  onClick={addCustomSidebarGroup}
+                  disabled={folderPaths.length === 0}
+                >
+                  {t('inspector.relationship.add')}
+                </Button>
+              </div>
+            </SettingsGroupItem>
+            {(RESEARCH_LAB_OPERATIONAL_KEYS as readonly ResearchLabDomainKey[]).map((field) => (
+              <SettingsSwitchRow
+                key={`sidebar-toggle-${field}`}
+                label={t(FIELD_LABEL_KEYS[field])}
+                description={config.folders[field]}
+                checked={!(config.hiddenSidebarGroups ?? []).includes(field)}
+                onChange={(visible) => onChange(setBuiltInSidebarGroupVisibility(config, field, visible))}
+                testId={`settings-research-lab-sidebar-toggle-${field}`}
+              />
+            ))}
+            {customSidebarGroups.map((group, index) => (
+              <ResearchLabCustomSidebarGroupField
+                key={group.id}
+                config={config}
+                folderPaths={folderPaths}
+                group={group}
+                index={index}
                 onChange={onChange}
                 t={t}
               />

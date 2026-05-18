@@ -1,5 +1,6 @@
 import type {
   FilterGroup,
+  LabHomeGroupId,
   ModifiedFile,
   NoteStatus,
   ResearchLabDomainKey,
@@ -270,13 +271,14 @@ export function resolveSearchPlaceholder(
 }
 
 export function resolveWorkspaceViewShortcuts(
+  selectedLabHomeGroupId: LabHomeGroupId | null = null,
   selectedLabDomain: ResearchLabDomainKey | null = null,
   views: readonly ViewFile[] = [],
   locale: AppLocale = 'en',
 ): readonly WorkspaceViewShortcut[] {
-  if (!selectedLabDomain) return []
+  if (!selectedLabHomeGroupId) return []
   const assignedViews = views
-    .filter((view) => view.definition.labHomeGroup === selectedLabDomain)
+    .filter((view) => view.definition.labHomeGroup === selectedLabHomeGroupId)
     .sort((left, right) => {
       const order = (left.definition.order ?? Number.MAX_SAFE_INTEGER)
         - (right.definition.order ?? Number.MAX_SAFE_INTEGER)
@@ -291,6 +293,8 @@ export function resolveWorkspaceViewShortcuts(
     }))
   }
 
+  if (!selectedLabDomain) return []
+
   return LAB_DOMAIN_WORKSPACE_VIEW_SHORTCUTS[selectedLabDomain].map((shortcut) => ({
     id: shortcut.id,
     label: translate(locale, shortcut.labelKey),
@@ -300,25 +304,28 @@ export function resolveWorkspaceViewShortcuts(
 
 function resolveActiveWorkspaceViewShortcut(
   selection: SidebarSelection,
+  selectedLabHomeGroupId: LabHomeGroupId | null,
   selectedLabDomain: ResearchLabDomainKey | null,
   selectedWorkspaceView: SelectedWorkspaceView | null,
   views: readonly ViewFile[] = [],
 ): WorkspaceViewShortcut | null {
-  if (selection.kind !== 'folder' || !selectedLabDomain || !selectedWorkspaceView) return null
-  if (selectedWorkspaceView.domain !== selectedLabDomain) return null
-  return resolveWorkspaceViewShortcuts(selectedLabDomain, views)
+  if (selection.kind !== 'folder' || !selectedLabHomeGroupId || !selectedWorkspaceView) return null
+  if (selectedWorkspaceView.domain !== selectedLabHomeGroupId) return null
+  return resolveWorkspaceViewShortcuts(selectedLabHomeGroupId, selectedLabDomain, views)
     .find((shortcut) => shortcut.id === selectedWorkspaceView.id) ?? null
 }
 
 export function filterEntriesBySelectedWorkspaceView(
   entries: VaultEntry[],
   selection: SidebarSelection,
+  selectedLabHomeGroupId: LabHomeGroupId | null,
   selectedLabDomain: ResearchLabDomainKey | null,
   selectedWorkspaceView: SelectedWorkspaceView | null,
   views: readonly ViewFile[] = [],
 ): VaultEntry[] {
   const activeShortcut = resolveActiveWorkspaceViewShortcut(
     selection,
+    selectedLabHomeGroupId,
     selectedLabDomain,
     selectedWorkspaceView,
     views,

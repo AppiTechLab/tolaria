@@ -187,6 +187,7 @@ export interface AllNotesConfig {
 export type ResearchLabDomainKey = 'ongoingProjects' | 'projectAcquisition' | 'teaching' | 'labManagement'
 export type ResearchLabSystemFolderKey = 'templates' | 'views' | 'aiPrompts' | 'archive'
 export type ResearchLabFolderKey = ResearchLabDomainKey | ResearchLabSystemFolderKey
+export type LabHomeGroupId = string
 
 export interface ResearchLabModeFolders {
   ongoingProjects: string
@@ -199,9 +200,17 @@ export interface ResearchLabModeFolders {
   archive: string
 }
 
+export interface ResearchLabCustomSidebarGroup {
+  id: LabHomeGroupId
+  label?: string | null
+  folderPath: string
+}
+
 export interface ResearchLabModeConfig {
   enabled: boolean
   folders: ResearchLabModeFolders
+  hiddenSidebarGroups?: ResearchLabDomainKey[] | null
+  customSidebarGroups?: ResearchLabCustomSidebarGroup[] | null
 }
 
 export type ResearchLabWorkspaceViewId =
@@ -231,7 +240,7 @@ export type ResearchLabWorkspaceViewId =
   | 'finance'
 
 export interface SelectedWorkspaceView {
-  domain: ResearchLabDomainKey
+  domain: LabHomeGroupId
   id: string
 }
 
@@ -306,8 +315,8 @@ export interface ViewDefinition {
   order?: number | null
   sort: string | null
   listPropertiesDisplay?: string[]
-  /** Optional Lab Home group used to surface this saved view in Research Lab workspace shortcuts. */
-  labHomeGroup?: ResearchLabDomainKey | null
+  /** Optional Lab Home group id used to surface this saved view in Research Lab workspace shortcuts. */
+  labHomeGroup?: LabHomeGroupId | null
   filters: FilterGroup
 }
 

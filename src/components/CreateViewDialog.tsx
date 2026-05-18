@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FilterBuilder } from './FilterBuilder'
-import type { FilterGroup, ResearchLabDomainKey, ViewDefinition } from '../types'
+import type { FilterGroup, LabHomeGroupId, ResearchLabCustomSidebarGroup, ResearchLabDomainKey, ResearchLabModeConfig, ViewDefinition } from '../types'
 import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
+import { vaultRelativePathLabel } from '../utils/notePathIdentity'
 
 type SaveViewResult = boolean | void
 type SaveViewHandler = (definition: ViewDefinition) => SaveViewResult | Promise<SaveViewResult>
@@ -20,13 +21,43 @@ const LAB_HOME_GROUP_LABEL_KEYS: Record<ResearchLabDomainKey, TranslationKey> = 
   labManagement: 'labHome.section.labManagement.title',
 }
 
+interface LabHomeGroupOption {
+  value: LabHomeGroupId
+  label: string
+}
+
+function resolveCustomLabHomeGroupLabel(group: ResearchLabCustomSidebarGroup): string {
+  const label = group.label?.trim()
+  if (label) return label
+  return vaultRelativePathLabel(group.folderPath)
+}
+
+function resolveLabHomeGroupOptions(
+  researchLabMode: ResearchLabModeConfig | null | undefined,
+  locale: AppLocale,
+): LabHomeGroupOption[] {
+  if (researchLabMode?.enabled !== true) return []
+
+  return [
+    ...Object.entries(LAB_HOME_GROUP_LABEL_KEYS).map(([value, labelKey]) => ({
+      value,
+      label: translate(locale, labelKey),
+    })),
+    ...(researchLabMode.customSidebarGroups ?? []).flatMap((group) => {
+      const label = resolveCustomLabHomeGroupLabel(group)
+      if (!label) return []
+      return [{ value: group.id, label }]
+    }),
+  ]
+}
+
 interface CreateViewDialogProps {
   open: boolean
   onClose: () => void
   onCreate: SaveViewHandler
   availableFields: string[]
   locale?: AppLocale
-  researchLabModeEnabled?: boolean
+  researchLabMode?: ResearchLabModeConfig | null
   /** When provided, the dialog operates in edit mode with pre-populated fields. */
   editingView?: ViewDefinition | null
 }
@@ -37,8 +68,9 @@ interface CreateViewDialogFormProps {
   initialIcon: string
   initialColor: string | null
   initialFilters: FilterGroup
-  initialLabHomeGroup: ResearchLabDomainKey | null
+  initialLabHomeGroup: LabHomeGroupId | null
   isEditing: boolean
+  labHomeGroupOptions: LabHomeGroupOption[]
   locale: AppLocale
   showLabHomeGroupField: boolean
   onClose: () => void
@@ -53,6 +85,7 @@ function CreateViewDialogForm({
   initialFilters,
   initialLabHomeGroup,
   isEditing,
+  labHomeGroupOptions,
   locale,
   showLabHomeGroupField,
   onClose,
@@ -60,7 +93,7 @@ function CreateViewDialogForm({
 }: CreateViewDialogFormProps) {
   const [name, setName] = useState(initialName)
   const [filters, setFilters] = useState<FilterGroup>(initialFilters)
-  const [labHomeGroup, setLabHomeGroup] = useState<ResearchLabDomainKey | null>(initialLabHomeGroup)
+  const [labHomeGroup, setLabHomeGroup] = useState<LabHomeGroupId | null>(initialLabHomeGroup)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -124,7 +157,7 @@ function CreateViewDialogForm({
           <Select
             value={labHomeGroup ?? UNASSIGNED_LAB_HOME_GROUP}
             onValueChange={(value) => {
-              setLabHomeGroup(value === UNASSIGNED_LAB_HOME_GROUP ? null : value as ResearchLabDomainKey)
+              setLabHomeGroup(value === UNASSIGNED_LAB_HOME_GROUP ? null : value)
               if (saveError) setSaveError(null)
             }}
           >
@@ -133,9 +166,9 @@ function CreateViewDialogForm({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={UNASSIGNED_LAB_HOME_GROUP}>{translate(locale, 'inspector.properties.none')}</SelectItem>
-              {Object.entries(LAB_HOME_GROUP_LABEL_KEYS).map(([value, labelKey]) => (
+              {labHomeGroupOptions.map(({ value, label }) => (
                 <SelectItem key={value} value={value}>
-                  {translate(locale, labelKey)}
+                  {label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -190,11 +223,12 @@ export function CreateViewDialog({
   onCreate,
   availableFields,
   locale = 'en',
-  researchLabModeEnabled = false,
+  researchLabMode = null,
   editingView,
 }: CreateViewDialogProps) {
   const isEditing = !!editingView
   const initialValues = getInitialViewFormValues(editingView, availableFields)
+  const labHomeGroupOptions = resolveLabHomeGroupOptions(researchLabMode, locale)
   const formKey = editingView
     ? `edit:${editingView.name}:${editingView.labHomeGroup ?? 'none'}`
     : `create:${availableFields[0] ?? 'type'}`
@@ -218,8 +252,9 @@ export function CreateViewDialog({
             initialFilters={initialValues.filters}
             initialLabHomeGroup={initialValues.labHomeGroup ?? null}
             isEditing={isEditing}
+            labHomeGroupOptions={labHomeGroupOptions}
             locale={locale}
-            showLabHomeGroupField={researchLabModeEnabled}
+            showLabHomeGroupField={researchLabMode?.enabled === true}
             onClose={onClose}
             onCreate={onCreate}
           />

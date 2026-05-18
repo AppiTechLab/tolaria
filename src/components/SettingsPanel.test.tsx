@@ -760,6 +760,46 @@ describe('SettingsPanel', () => {
     }))
   })
 
+  it('saves Lab Home sidebar group customization through the dedicated vault-config callback', () => {
+    const onSaveResearchLabMode = vi.fn()
+
+    render(
+      <SettingsPanel
+        {...({
+          open: true,
+          settings: emptySettings,
+          onSave,
+          onClose,
+          researchLabMode: emptyResearchLabMode,
+          vaultFolders: [
+            {
+              name: 'Projects',
+              path: 'Projects',
+              children: [],
+            },
+          ],
+          onSaveResearchLabMode,
+        } as never)}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Enable Research Lab Mode' }))
+    fireEvent.click(screen.getByTestId('settings-research-lab-sidebar-toggle-teaching'))
+    fireEvent.click(screen.getByTestId('settings-research-lab-custom-sidebar-add'))
+    fireEvent.change(screen.getByTestId('settings-research-lab-custom-sidebar-0-label'), {
+      target: { value: 'Grant Pipeline' },
+    })
+    saveSettingsPanel()
+
+    expect(onSaveResearchLabMode).toHaveBeenCalledWith(expect.objectContaining({
+      enabled: true,
+      hiddenSidebarGroups: ['teaching'],
+      customSidebarGroups: [
+        expect.objectContaining({ label: 'Grant Pipeline', folderPath: 'Projects' }),
+      ],
+    }))
+  })
+
   it('saves the auto-advance inbox preference when toggled on', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />

@@ -252,25 +252,25 @@ function NoteListBody({
 
 function WorkspaceViewShortcutStrip({
   showWorkspaceViewShortcuts,
-  selectedLabDomain,
+  selectedLabHomeGroupId,
   workspaceViewShortcuts,
   selectedWorkspaceView,
   onSelectWorkspaceView,
 }: Pick<
   NoteListLayoutProps,
   | 'showWorkspaceViewShortcuts'
-  | 'selectedLabDomain'
+  | 'selectedLabHomeGroupId'
   | 'workspaceViewShortcuts'
   | 'selectedWorkspaceView'
   | 'onSelectWorkspaceView'
 >) {
-  if (!showWorkspaceViewShortcuts || !selectedLabDomain || workspaceViewShortcuts.length === 0) return null
+  if (!showWorkspaceViewShortcuts || !selectedLabHomeGroupId || workspaceViewShortcuts.length === 0) return null
 
   return (
     <div data-testid="workspace-view-shortcuts" className="border-b border-border bg-muted/20 px-3 py-3">
       <div className="flex flex-wrap gap-2">
         {workspaceViewShortcuts.map((shortcut) => {
-          const isSelected = selectedWorkspaceView?.domain === selectedLabDomain && selectedWorkspaceView.id === shortcut.id
+          const isSelected = selectedWorkspaceView?.domain === selectedLabHomeGroupId && selectedWorkspaceView.id === shortcut.id
           return (
             <Button
               key={shortcut.id}
@@ -280,7 +280,7 @@ function WorkspaceViewShortcutStrip({
               aria-pressed={isSelected}
               data-testid={`workspace-view-shortcut-${shortcut.id}`}
               className={isSelected ? 'h-8 rounded-full bg-primary/10 px-3 text-xs text-primary hover:bg-primary/15' : 'h-8 rounded-full px-3 text-xs'}
-              onClick={() => onSelectWorkspaceView?.({ domain: selectedLabDomain, id: shortcut.id })}
+              onClick={() => onSelectWorkspaceView?.({ domain: selectedLabHomeGroupId, id: shortcut.id })}
             >
               {shortcut.label}
             </Button>

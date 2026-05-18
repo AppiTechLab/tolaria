@@ -30,7 +30,7 @@ import { computeReorder } from './sidebarHooks'
 import { SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM } from './sidebarStyles'
 import { countByFilter } from '../../utils/noteListHelpers'
 import { viewIdentityKey, viewSelectionForView } from '../../utils/viewIdentity'
-import { normalizeVaultRelativePath } from '../../utils/notePathIdentity'
+import { normalizeVaultRelativePath, vaultRelativePathLabel } from '../../utils/notePathIdentity'
 import { translate, type AppLocale } from '../../lib/i18n'
 import type { ResearchLabDomainKey, ResearchLabModeConfig } from '../../types'
 
@@ -73,6 +73,60 @@ const LAB_HOME_SECTION_ITEMS: Array<{
     color: 'var(--accent-teal)',
   },
 ]
+
+type LabHomeSidebarItem = {
+  id: string
+  label: string
+  path: string
+  icon: typeof FolderSimple
+  color: string
+  builtInKey: ResearchLabDomainKey | null
+}
+
+function resolveLabHomeSidebarItems(
+  researchLabMode: ResearchLabModeConfig,
+  locale: AppLocale,
+): LabHomeSidebarItem[] {
+  const hiddenSidebarGroups = new Set(researchLabMode.hiddenSidebarGroups ?? [])
+
+  const builtInItems = LAB_HOME_SECTION_ITEMS.flatMap((item) => {
+    if (hiddenSidebarGroups.has(item.key)) return []
+
+    const path = normalizeVaultRelativePath(researchLabMode.folders[item.key])
+    if (!path) return []
+
+    return [{
+      id: item.id,
+      label: translate(locale, item.labelKey),
+      path,
+      icon: item.icon,
+      color: item.color,
+      builtInKey: item.key,
+    }]
+  })
+
+  const customItems = (researchLabMode.customSidebarGroups ?? []).flatMap((group) => {
+    const path = normalizeVaultRelativePath(group.folderPath)
+    if (!path) return []
+
+    const label = typeof group.label === 'string' && group.label.trim()
+      ? group.label.trim()
+      : vaultRelativePathLabel(path)
+
+    if (!label) return []
+
+    return [{
+      id: `custom-${group.id}`,
+      label,
+      path,
+      icon: FolderSimple,
+      color: 'var(--muted-foreground)',
+      builtInKey: null,
+    }]
+  })
+
+  return [...builtInItems, ...customItems]
+}
 
 const SIDEBAR_TITLE_BAR_ACTION_CLASSNAME =
   '!h-auto !w-auto !min-w-0 !rounded-none !p-0 text-muted-foreground hover:!bg-transparent hover:text-foreground [&_svg]:!size-4'
@@ -212,6 +266,8 @@ export function ResearchLabHomeSection({
 }) {
   if (researchLabMode?.enabled !== true) return null
 
+  const items = resolveLabHomeSidebarItems(researchLabMode, locale)
+
   return (
     <div className="border-b border-border" data-testid="research-lab-sidebar-section">
       <div style={{ padding: '0 6px' }}>
@@ -219,22 +275,19 @@ export function ResearchLabHomeSection({
       </div>
       {!collapsed && (
         <div className="space-y-1" style={{ padding: '0 6px 4px 22px' }}>
-          {LAB_HOME_SECTION_ITEMS.map((item) => {
-            const path = normalizeVaultRelativePath(researchLabMode.folders[item.key])
-            if (!path) return null
-
+          {items.map((item) => {
             const target: SidebarSelection = vaultRootPath
-              ? { kind: 'folder', path, rootPath: vaultRootPath }
-              : { kind: 'folder', path }
+              ? { kind: 'folder', path: item.path, rootPath: vaultRootPath }
+              : { kind: 'folder', path: item.path }
 
             return (
               <div key={item.id} data-testid={`research-lab-sidebar-item-${item.id}`}>
                 <NavItem
                   icon={item.icon}
-                  label={translate(locale, item.labelKey)}
-                  isActive={selectedLabDomain === item.key || isSelectionActive(selection, target)}
+                  label={item.label}
+                  isActive={item.builtInKey ? selectedLabDomain === item.builtInKey || isSelectionActive(selection, target) : isSelectionActive(selection, target)}
                   onClick={() => {
-                    onSelectLabDomain?.(item.key)
+                    onSelectLabDomain?.(item.builtInKey)
                     onSelect(target)
                   }}
                   compact

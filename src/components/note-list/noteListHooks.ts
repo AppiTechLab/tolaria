@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import type {
+  LabHomeGroupId,
   ModifiedFile,
   NoteStatus,
   ResearchLabDomainKey,
@@ -125,6 +126,7 @@ interface NoteListDataParams {
   inboxPeriod?: InboxPeriod
   views?: ViewFile[]
   allNotesFileVisibility?: AllNotesFileVisibility
+  selectedLabHomeGroupId?: LabHomeGroupId | null
   selectedLabDomain?: ResearchLabDomainKey | null
   selectedWorkspaceView?: SelectedWorkspaceView | null
 }
@@ -142,9 +144,11 @@ export function useNoteListData({
   inboxPeriod,
   views,
   allNotesFileVisibility,
+  selectedLabHomeGroupId = null,
   selectedLabDomain = null,
   selectedWorkspaceView = null,
 }: NoteListDataParams) {
+  const activeLabHomeGroupId = selectedLabHomeGroupId ?? selectedLabDomain ?? null
   const isEntityView = selection.kind === 'entity'
   const isArchivedView = (selection.kind === 'filter' && selection.filter === 'archived') || subFilter === 'archived'
   const entityEntry = useMemo(() => {
@@ -168,13 +172,14 @@ export function useNoteListData({
     const workspaceFilteredEntries = filterEntriesBySelectedWorkspaceView(
       filteredEntries,
       selection,
+      activeLabHomeGroupId,
       selectedLabDomain,
       selectedWorkspaceView,
       views,
     )
     const sorted = [...workspaceFilteredEntries].sort(getSortComparator(listSort, listDirection))
     return filterByQuery(sorted, query)
-  }, [filteredEntries, listDirection, listSort, query, selectedLabDomain, selectedWorkspaceView, selection, views])
+  }, [activeLabHomeGroupId, filteredEntries, listDirection, listSort, query, selectedLabDomain, selectedWorkspaceView, selection, views])
 
   const searchedGroups = useMemo(() => {
     if (!entityEntry) return []

@@ -5,6 +5,7 @@ import type {
   ModifiedFile,
   NoteStatus,
   InboxPeriod,
+  LabHomeGroupId,
   ResearchLabDomainKey,
   SelectedWorkspaceView,
   ViewDefinition,
@@ -164,6 +165,7 @@ interface UseNoteListContentParams {
   modifiedPathSet: Set<string>
   isInboxView: boolean
   selectedNotePath: string | null
+  selectedLabHomeGroupId?: LabHomeGroupId | null
   selectedLabDomain?: ResearchLabDomainKey | null
   selectedWorkspaceView?: SelectedWorkspaceView | null
   allNotesNoteListProperties?: string[] | null
@@ -188,6 +190,7 @@ function useNoteListContent({
   modifiedPathSet,
   isInboxView,
   selectedNotePath,
+  selectedLabHomeGroupId,
   selectedLabDomain,
   selectedWorkspaceView,
   allNotesNoteListProperties,
@@ -262,6 +265,7 @@ function useNoteListContent({
     inboxPeriod: effectiveInboxPeriod,
     views,
     allNotesFileVisibility,
+    selectedLabHomeGroupId,
     selectedLabDomain,
     selectedWorkspaceView,
   })
@@ -482,6 +486,7 @@ export interface NoteListProps {
   entries: VaultEntry[]
   selection: SidebarSelection
   selectedNote: VaultEntry | null
+  selectedLabHomeGroupId?: LabHomeGroupId | null
   selectedLabDomain?: ResearchLabDomainKey | null
   selectedWorkspaceView?: SelectedWorkspaceView | null
   onSelectWorkspaceView?: (selection: SelectedWorkspaceView) => void
@@ -527,6 +532,7 @@ function buildNoteListLayoutModel(params: {
   views?: ViewFile[]
   sidebarCollapsed?: boolean
   researchLabModeEnabled?: boolean
+  selectedLabHomeGroupId?: LabHomeGroupId | null
   selectedLabDomain?: ResearchLabDomainKey | null
   selectedWorkspaceView?: SelectedWorkspaceView | null
   onSelectWorkspaceView?: (selection: SelectedWorkspaceView) => void
@@ -548,6 +554,14 @@ function buildNoteListLayoutModel(params: {
     entitySelection: EntitySelection | null
   }
 }) {
+  const activeLabHomeGroupId = params.selectedLabHomeGroupId ?? params.selectedLabDomain ?? null
+  const workspaceViewShortcuts = resolveWorkspaceViewShortcuts(
+    activeLabHomeGroupId,
+    params.selectedLabDomain,
+    params.views,
+    params.locale,
+  )
+
   return {
     title: resolveHeaderTitle(
       params.selection,
@@ -574,15 +588,13 @@ function buildNoteListLayoutModel(params: {
     ),
     showWorkspaceViewShortcuts: Boolean(
       params.researchLabModeEnabled
-      && params.selectedLabDomain
+      && activeLabHomeGroupId
       && params.selection.kind === 'folder'
+      && workspaceViewShortcuts.length > 0
     ),
+    selectedLabHomeGroupId: activeLabHomeGroupId,
     selectedLabDomain: params.selectedLabDomain ?? null,
-    workspaceViewShortcuts: resolveWorkspaceViewShortcuts(
-      params.selectedLabDomain,
-      params.views,
-      params.locale,
-    ),
+    workspaceViewShortcuts,
     selectedWorkspaceView: params.selectedWorkspaceView ?? null,
     onSelectWorkspaceView: params.onSelectWorkspaceView,
     isSearching: params.content.isSearching,
@@ -637,6 +649,7 @@ export function useNoteListModel({
   entries,
   selection,
   selectedNote,
+  selectedLabHomeGroupId = null,
   selectedLabDomain = null,
   selectedWorkspaceView = null,
   onSelectWorkspaceView,
@@ -687,6 +700,7 @@ export function useNoteListModel({
     modifiedPathSet,
     isInboxView,
     selectedNotePath,
+    selectedLabHomeGroupId,
     selectedLabDomain,
     selectedWorkspaceView,
     allNotesNoteListProperties,
@@ -768,6 +782,7 @@ export function useNoteListModel({
     views,
     sidebarCollapsed,
     researchLabModeEnabled,
+    selectedLabHomeGroupId,
     selectedLabDomain,
     selectedWorkspaceView,
     onSelectWorkspaceView,

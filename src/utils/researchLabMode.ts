@@ -1,5 +1,7 @@
 import type {
   FolderNode,
+  ResearchLabCustomSidebarGroup,
+  ResearchLabDomainKey,
   ResearchLabFolderKey,
   ResearchLabModeConfig,
   ResearchLabModeFolders,
@@ -28,6 +30,13 @@ export const RESEARCH_LAB_OPERATIONAL_KEYS = [
   'teaching',
   'labManagement',
 ] as const satisfies readonly ResearchLabFolderKey[]
+
+const RESEARCH_LAB_DOMAIN_KEY_SET = new Set<ResearchLabDomainKey>([
+  'ongoingProjects',
+  'projectAcquisition',
+  'teaching',
+  'labManagement',
+])
 
 export const RESEARCH_LAB_SYSTEM_KEYS = [
   'templates',
@@ -61,10 +70,63 @@ export interface ResearchLabValidationResult {
   warnings: ResearchLabValidationIssue[]
 }
 
+function isResearchLabDomainKey(value: unknown): value is ResearchLabDomainKey {
+  return typeof value === 'string' && RESEARCH_LAB_DOMAIN_KEY_SET.has(value as ResearchLabDomainKey)
+}
+
+function normalizeResearchLabHiddenSidebarGroups(
+  hiddenSidebarGroups: readonly unknown[] | null | undefined,
+): ResearchLabDomainKey[] {
+  if (!Array.isArray(hiddenSidebarGroups)) return []
+
+  const seen = new Set<ResearchLabDomainKey>()
+  return hiddenSidebarGroups.flatMap((value) => {
+    if (!isResearchLabDomainKey(value) || seen.has(value)) return []
+    seen.add(value)
+    return [value]
+  })
+}
+
+function normalizeResearchLabCustomSidebarGroups(
+  customSidebarGroups: readonly unknown[] | null | undefined,
+): ResearchLabCustomSidebarGroup[] {
+  if (!Array.isArray(customSidebarGroups)) return []
+
+  const seenIds = new Set<string>()
+  let nextId = 1
+
+  return customSidebarGroups.flatMap((value) => {
+    if (!value || typeof value !== 'object') return []
+
+    const candidate = value as Partial<ResearchLabCustomSidebarGroup>
+    const folderPath = normalizeVaultRelativePath(typeof candidate.folderPath === 'string' ? candidate.folderPath : '')
+    if (!folderPath) return []
+
+    const label = typeof candidate.label === 'string' ? candidate.label.trim() : ''
+    let id = typeof candidate.id === 'string' ? candidate.id.trim() : ''
+
+    if (!id || seenIds.has(id)) {
+      while (seenIds.has(`custom-${nextId}`)) nextId += 1
+      id = `custom-${nextId}`
+      nextId += 1
+    }
+
+    seenIds.add(id)
+
+    return [{
+      id,
+      label: label || null,
+      folderPath,
+    }]
+  })
+}
+
 export function createDefaultResearchLabModeConfig(): ResearchLabModeConfig {
   return {
     enabled: false,
     folders: { ...DEFAULT_RESEARCH_LAB_MODE_FOLDERS },
+    hiddenSidebarGroups: [],
+    customSidebarGroups: [],
   }
 }
 
@@ -81,6 +143,8 @@ export function normalizeResearchLabModeConfig(
       result[key] = normalized || defaults.folders[key]
       return result
     }, { ...defaults.folders }),
+    hiddenSidebarGroups: normalizeResearchLabHiddenSidebarGroups(config?.hiddenSidebarGroups),
+    customSidebarGroups: normalizeResearchLabCustomSidebarGroups(config?.customSidebarGroups),
   }
 }
 
