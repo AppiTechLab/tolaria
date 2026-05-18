@@ -18,6 +18,14 @@ type TaskSortField = 'description' | 'due' | 'path' | 'priority'
 type TaskSortDirection = 'asc' | 'desc'
 type TaskGroupField = 'filename' | 'path'
 
+interface TaskTagPrefixGroupBy {
+  kind: 'tag_prefix'
+  prefix: string
+  separator: string
+}
+
+type TaskGroupBy = TaskGroupField | TaskTagPrefixGroupBy
+
 interface TaskDateComparison {
   operator: TaskDateOperator
   timestamp: number
@@ -68,7 +76,7 @@ export interface TaskQueryDefinition {
   priorityFilters: Array<{ operator: TaskPriorityOperator; priority: TaskPriorityName }>
   limit: number | null
   sorts: Array<{ field: TaskSortField; direction: TaskSortDirection }>
-  groupBy: TaskGroupField | null
+  groupBy: TaskGroupBy | null
   explain: boolean
   unsupported: string[]
 }
@@ -296,6 +304,20 @@ function parseGroupField(rawField: string): TaskGroupField | null {
   return null
 }
 
+function parseTagPrefixGroupBy(rawLine: string): TaskTagPrefixGroupBy | null {
+  const match = /^group by function\s+task\.tags\.filter\(\s*t\s*=>\s*t\.startsWith\((['"])(.*?)\1\)\s*\)\.join\((['"])(.*?)\3\)\s*$/iu.exec(rawLine)
+  if (!match) return null
+
+  const prefix = normalizeTag(match[2] ?? '')
+  if (!prefix) return null
+
+  return {
+    kind: 'tag_prefix',
+    prefix,
+    separator: match[4] ?? ', ',
+  }
+}
+
 function parseTaskQueryLine(line: string, query: TaskQueryDefinition, referenceDate: Date): void {
   const trimmed = line.trim()
   if (!trimmed || trimmed.startsWith('#')) return
@@ -377,6 +399,12 @@ function parseTaskQueryLine(line: string, query: TaskQueryDefinition, referenceD
   const groupMatch = /^group by\s+(filename|path)$/iu.exec(trimmed)
   if (groupMatch?.[1]) {
     query.groupBy = parseGroupField(groupMatch[1].toLowerCase())
+    return
+  }
+
+  const tagPrefixGroupBy = parseTagPrefixGroupBy(trimmed)
+  if (tagPrefixGroupBy) {
+    query.groupBy = tagPrefixGroupBy
     return
   }
 
@@ -490,6 +518,22 @@ function taskMatchesPriorityFilter(task: MarkdownTask, filter: TaskQueryDefiniti
   return taskRank === filterRank
 }
 
+function taskMatchesTagFilter(taskTags: string[], queryTag: string): boolean {
+  const descendantPrefix = queryTag.endsWith('/') ? queryTag : `${queryTag}/`
+  return taskTags.some((taskTag) => taskTag === queryTag || taskTag.startsWith(descendantPrefix))
+}
+
+function resolveTaskGroupKey(task: MarkdownTask, groupBy: TaskGroupBy): string {
+  if (groupBy === 'filename') return filenameFromPath(task.path)
+  if (groupBy === 'path') return task.path
+
+  const matchingTags = task.tags
+    .filter((tag) => tag.startsWith(groupBy.prefix))
+    .map((tag) => `#${tag}`)
+
+  return matchingTags.join(groupBy.separator)
+}
+
 function taskMatchesQuery(task: MarkdownTask, query: TaskQueryDefinition): boolean {
   if (!taskMatchesStatus(task, query.status)) return false
   if (!taskMatchesDatePresence(task.dueDate, query.duePresence)) return false
@@ -497,7 +541,7 @@ function taskMatchesQuery(task: MarkdownTask, query: TaskQueryDefinition): boole
   if (!taskMatchesDatePresence(task.doneDate, query.donePresence)) return false
   if (query.pathIncludes.some((value) => !normalizePath(task.path).includes(value))) return false
   if (query.descriptionIncludes.some((value) => !task.description.toLowerCase().includes(value))) return false
-  if (query.tagIncludes.some((value) => !task.tags.includes(value))) return false
+  if (query.tagIncludes.some((value) => !taskMatchesTagFilter(task.tags, value))) return false
   if (query.dueComparisons.some((comparison) => !taskMatchesDateComparison(task.dueDate, comparison))) return false
   if (query.scheduledComparisons.some((comparison) => !taskMatchesDateComparison(task.scheduledDate, comparison))) return false
   if (query.doneComparisons.some((comparison) => !taskMatchesDateComparison(task.doneDate, comparison))) return false
@@ -505,12 +549,12 @@ function taskMatchesQuery(task: MarkdownTask, query: TaskQueryDefinition): boole
   return true
 }
 
-function groupTasks(tasks: MarkdownTask[], groupBy: TaskGroupField | null): TaskQueryGroup[] {
+function groupTasks(tasks: MarkdownTask[], groupBy: TaskGroupBy | null): TaskQueryGroup[] {
   if (!groupBy) return []
 
   const groups = new Map<string, MarkdownTask[]>()
   for (const task of tasks) {
-    const key = groupBy === 'filename' ? filenameFromPath(task.path) : task.path
+    const key = resolveTaskGroupKey(task, groupBy)
     const existing = groups.get(key)
     if (existing) {
       existing.push(task)

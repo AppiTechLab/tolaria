@@ -143,6 +143,74 @@ describe('taskQuery', () => {
     ])
   })
 
+  it('matches tag prefixes and combines repeated tag filters with AND', () => {
+    const result = executeTaskQuery({
+      queryText: [
+        'not done',
+        'tags include #PM/assign/widmera',
+        'tags include #PM/project/',
+        'sort by path',
+      ].join('\n'),
+      contentByPath: {
+        '/vault/project/alpha.md': [
+          '# Alpha',
+          '',
+          '- [ ] Matching task #PM/assign/widmera #PM/project/Auto-Anno',
+          '- [ ] Missing project tag #PM/assign/widmera',
+        ].join('\n'),
+        '/vault/project/beta.md': [
+          '# Beta',
+          '',
+          '- [ ] Missing assign tag #PM/project/Elsewhere',
+        ].join('\n'),
+      },
+    })
+
+    expect(result.tasks.map((task) => `${task.path}:${task.description}`)).toEqual([
+      '/vault/project/alpha.md:Matching task #PM/assign/widmera #PM/project/Auto-Anno',
+    ])
+  })
+
+  it('groups tasks with the supported task.tags prefix function syntax', () => {
+    const result = executeTaskQuery({
+      queryText: [
+        'not done',
+        'tags include #PM/assign/widmera',
+        'tags include #PM/sub/',
+        'group by function task.tags.filter(t => t.startsWith("#PM/sub/")).join(", ")',
+        'sort by path',
+      ].join('\n'),
+      contentByPath: {
+        '/vault/project/alpha.md': [
+          '# Alpha',
+          '',
+          '- [ ] Teaching follow-up #PM/assign/widmera #PM/sub/Teaching',
+          '- [ ] Outreach follow-up #PM/assign/widmera #PM/sub/Outreach',
+        ].join('\n'),
+        '/vault/project/beta.md': [
+          '# Beta',
+          '',
+          '- [ ] Dual-tag follow-up #PM/assign/widmera #PM/sub/Outreach #PM/sub/Teaching',
+        ].join('\n'),
+      },
+    })
+
+    expect(result.groups).toEqual([
+      {
+        key: '#pm/sub/teaching',
+        tasks: [expect.objectContaining({ description: 'Teaching follow-up #PM/assign/widmera #PM/sub/Teaching' })],
+      },
+      {
+        key: '#pm/sub/outreach',
+        tasks: [expect.objectContaining({ description: 'Outreach follow-up #PM/assign/widmera #PM/sub/Outreach' })],
+      },
+      {
+        key: '#pm/sub/outreach, #pm/sub/teaching',
+        tasks: [expect.objectContaining({ description: 'Dual-tag follow-up #PM/assign/widmera #PM/sub/Outreach #PM/sub/Teaching' })],
+      },
+    ])
+  })
+
   it('supports priority filters and sorts higher priorities first', () => {
     const result = executeTaskQuery({
       queryText: [

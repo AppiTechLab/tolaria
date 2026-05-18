@@ -316,7 +316,7 @@ function resolveActiveWorkspaceViewShortcut(
 }
 
 export function filterEntriesBySelectedWorkspaceView(
-  entries: VaultEntry[],
+  scopedEntries: VaultEntry[],
   selection: SidebarSelection,
   selectedLabHomeGroupId: LabHomeGroupId | null,
   selectedLabDomain: ResearchLabDomainKey | null,
@@ -330,8 +330,8 @@ export function filterEntriesBySelectedWorkspaceView(
     selectedWorkspaceView,
     views,
   )
-  if (!activeShortcut) return entries
-  return entries.filter((entry) => evaluateFilterGroup(activeShortcut.filters, entry))
+  if (!activeShortcut) return scopedEntries
+  return scopedEntries.filter((entry) => evaluateFilterGroup(activeShortcut.filters, entry))
 }
 
 function searchableTitle(entry: { title?: unknown }): string {
