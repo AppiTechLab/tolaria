@@ -194,6 +194,10 @@ Working on #alpha/test and #deep-work and #frontmatter.
 
     assert_eq!(
         entry.properties.get("tags"),
-        Some(&serde_json::json!(["frontmatter", "alpha/test", "deep-work"]))
+        Some(&serde_json::json!([
+            "frontmatter",
+            "alpha/test",
+            "deep-work"
+        ]))
     );
 }

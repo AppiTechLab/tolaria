@@ -50,7 +50,9 @@ pub use views::{
 
 use file::read_file_metadata;
 use frontmatter::{extract_fm_and_rels, resolve_is_a, resolve_note_width};
-use parsing::{count_body_words, extract_inline_tags, extract_outgoing_links, extract_snippet, extract_title};
+use parsing::{
+    count_body_words, extract_inline_tags, extract_outgoing_links, extract_snippet, extract_title,
+};
 
 use gray_matter::engine::YAML;
 use gray_matter::Matter;
@@ -104,12 +106,7 @@ fn merge_inline_tags_into_properties(
 
     properties.insert(
         tag_key,
-        serde_json::Value::Array(
-            merged
-                .into_iter()
-                .map(serde_json::Value::String)
-                .collect(),
-        ),
+        serde_json::Value::Array(merged.into_iter().map(serde_json::Value::String).collect()),
     );
 }
 
@@ -150,7 +147,8 @@ pub fn parse_md_file(path: &Path, git_dates: Option<(u64, u64)>) -> Result<Vault
 
     let matter = Matter::<YAML>::new();
     let parsed = matter.parse(&content);
-    let (frontmatter, mut relationships, mut properties) = extract_fm_and_rels(parsed.data, &content);
+    let (frontmatter, mut relationships, mut properties) =
+        extract_fm_and_rels(parsed.data, &content);
     let inline_tags = extract_inline_tags(&parsed.content);
     merge_inline_tags_into_properties(&mut properties, &inline_tags);
 

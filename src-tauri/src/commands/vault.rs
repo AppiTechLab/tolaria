@@ -184,8 +184,14 @@ mod tests {
         let content = get_all_content(vault_path.to_path_buf()).await.unwrap();
 
         assert_eq!(content.len(), 2);
-        assert_eq!(content.get(&markdown.to_string_lossy().to_string()), Some(&"# Alpha\n".to_string()));
-        assert_eq!(content.get(&nested_markdown.to_string_lossy().to_string()), Some(&"# Beta\n".to_string()));
+        assert_eq!(
+            content.get(&markdown.to_string_lossy().to_string()),
+            Some(&"# Alpha\n".to_string())
+        );
+        assert_eq!(
+            content.get(&nested_markdown.to_string_lossy().to_string()),
+            Some(&"# Beta\n".to_string())
+        );
         assert!(!content.contains_key(&text_note.to_string_lossy().to_string()));
     }
 

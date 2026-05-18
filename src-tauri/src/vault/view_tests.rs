@@ -59,9 +59,9 @@ filters:
         }
     }
 
-        #[test]
-        fn test_parse_lab_home_group() {
-                let yaml = r#"
+    #[test]
+    fn test_parse_lab_home_group() {
+        let yaml = r#"
 name: Active Projects
 labHomeGroup: ongoingProjects
 filters:
@@ -70,9 +70,9 @@ filters:
             op: equals
             value: Project
 "#;
-                let def: ViewDefinition = serde_yaml::from_str(yaml).unwrap();
-                assert_eq!(def.lab_home_group.as_deref(), Some("ongoingProjects"));
-        }
+        let def: ViewDefinition = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(def.lab_home_group.as_deref(), Some("ongoingProjects"));
+    }
 
     #[test]
     fn test_evaluate_equals() {
