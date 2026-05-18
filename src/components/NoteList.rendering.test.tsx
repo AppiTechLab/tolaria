@@ -12,7 +12,7 @@ import {
   mockEntries,
   renderNoteList,
 } from '../test-utils/noteListTestUtils'
-import type { ViewFile } from '../types'
+import type { ResearchLabDomainKey, SelectedWorkspaceView, ViewFile } from '../types'
 
 function makeBookTypeEntries(
   displayProps: string[] = [],
@@ -85,6 +85,43 @@ function renderManagedViewNoteList({
   }
 }
 
+function renderManagedWorkspaceViewNoteList({
+  selectedLabDomain,
+  entries = [],
+  views = [],
+}: {
+  selectedLabDomain: ResearchLabDomainKey
+  entries?: Parameters<typeof renderNoteList>[0]['entries']
+  views?: ViewFile[]
+}) {
+  const folderPathByDomain: Record<ResearchLabDomainKey, string> = {
+    ongoingProjects: 'Projects/Ongoing',
+    projectAcquisition: 'Projects/Acquisition',
+    teaching: 'Teaching',
+    labManagement: 'Lab Management',
+  }
+
+  function ManagedWorkspaceViewNoteList() {
+    const [selectedWorkspaceView, setSelectedWorkspaceView] = useState<SelectedWorkspaceView | null>(null)
+
+    return (
+      <NoteList
+        {...buildNoteListProps({
+          entries,
+          selection: { kind: 'folder', path: folderPathByDomain[selectedLabDomain] },
+          views,
+          selectedLabDomain,
+          selectedWorkspaceView,
+          onSelectWorkspaceView: setSelectedWorkspaceView,
+          researchLabModeEnabled: true,
+        }).props}
+      />
+    )
+  }
+
+  return render(<ManagedWorkspaceViewNoteList />)
+}
+
 async function searchNoteList(query: string) {
   const searchInput = screen.queryByPlaceholderText('Search notes...')
   if (!searchInput) fireEvent.click(screen.getByTitle('Search notes'))
@@ -144,6 +181,253 @@ describe('NoteList rendering', () => {
     expect(screen.getByText('Build Laputa App')).toBeInTheDocument()
     expect(screen.getByText('Facebook Ads Strategy')).toBeInTheDocument()
     expect(screen.getByText('Matteo Cellini')).toBeInTheDocument()
+  })
+
+  it('shows the workspace title for the default notes panel in research lab mode', () => {
+    renderNoteList({
+      researchLabModeEnabled: true,
+    })
+
+    expect(screen.getByRole('heading', { name: 'Workspace' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Notes' })).not.toBeInTheDocument()
+  })
+
+  it('preserves the notes title outside research lab mode', () => {
+    renderNoteList()
+
+    expect(screen.getByRole('heading', { name: 'Notes' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['ongoingProjects', 'Projects/Ongoing', 'Ongoing Projects'],
+    ['projectAcquisition', 'Projects/Acquisition', 'Project Acquisition'],
+    ['teaching', 'Teaching', 'Teaching'],
+    ['labManagement', 'Lab Management', 'Lab Management'],
+  ] as const)('shows %s as the research lab workspace title when that domain is selected', (selectedLabDomain, folderPath, title) => {
+    renderNoteList({
+      entries: [],
+      selection: { kind: 'folder', path: folderPath },
+      selectedLabDomain,
+      researchLabModeEnabled: true,
+    })
+
+    expect(screen.getByRole('heading', { name: title })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Workspace' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['ongoingProjects', 'Projects/Ongoing', ['Active', 'Deliverables', 'Meetings', 'Risks', 'Decisions', 'Archived']],
+    ['projectAcquisition', 'Projects/Acquisition', ['Ideas', 'Calls', 'Drafting', 'Submitted', 'Rejected', 'Resubmission Candidates']],
+    ['teaching', 'Teaching', ['Current Semester', 'Courses', 'Sessions', 'Exams', 'Student Projects', 'Rubrics']],
+    ['labManagement', 'Lab Management', ['Group Meeting', 'Equipment', 'Procedures', 'Strategy', 'Infrastructure', 'Finance']],
+  ] as const)('shows the correct workspace view shortcuts for %s', (selectedLabDomain, folderPath, shortcuts) => {
+    renderNoteList({
+      entries: [],
+      selection: { kind: 'folder', path: folderPath },
+      selectedLabDomain,
+      researchLabModeEnabled: true,
+    })
+
+    expect(screen.getByTestId('workspace-view-shortcuts')).toBeInTheDocument()
+    for (const shortcut of shortcuts) {
+      expect(screen.getByRole('button', { name: shortcut })).toBeInTheDocument()
+    }
+  })
+
+  it('updates the selected workspace view shortcut state when clicked', () => {
+    renderManagedWorkspaceViewNoteList({ selectedLabDomain: 'teaching' })
+
+    const sessionsShortcut = screen.getByRole('button', { name: 'Sessions' })
+    const coursesShortcut = screen.getByRole('button', { name: 'Courses' })
+
+    expect(sessionsShortcut).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(sessionsShortcut)
+    expect(sessionsShortcut).toHaveAttribute('aria-pressed', 'true')
+
+    fireEvent.click(coursesShortcut)
+    expect(coursesShortcut).toHaveAttribute('aria-pressed', 'true')
+    expect(sessionsShortcut).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('uses assigned saved views for workspace shortcuts when available', () => {
+    renderManagedWorkspaceViewNoteList({
+      selectedLabDomain: 'ongoingProjects',
+      views: [
+        makeViewDefinition({
+          filename: 'active-projects.yml',
+          definition: {
+            name: 'Active Projects',
+            labHomeGroup: 'ongoingProjects',
+            filters: { all: [{ field: 'type', op: 'equals', value: 'Project' }] },
+          },
+        }),
+      ],
+      entries: [
+        makeEntry({
+          path: '/vault/Projects/Ongoing/project-phoenix.md',
+          filename: 'project-phoenix.md',
+          title: 'Project Phoenix',
+          isA: 'Project',
+        }),
+        makeEntry({
+          path: '/vault/Projects/Ongoing/decision-log.md',
+          filename: 'decision-log.md',
+          title: 'Decision Log',
+          properties: { Category: 'Decision' },
+        }),
+      ],
+    })
+
+    expect(screen.getByRole('button', { name: 'Active Projects' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Deliverables' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Active Projects' }))
+
+    expect(screen.getByText('Project Phoenix')).toBeInTheDocument()
+    expect(screen.queryByText('Decision Log')).not.toBeInTheDocument()
+  })
+
+  it('filters workspace entries by explicit workspace-view frontmatter when selecting a shortcut', () => {
+    renderManagedWorkspaceViewNoteList({
+      selectedLabDomain: 'teaching',
+      entries: [
+        makeEntry({
+          path: '/vault/Teaching/session-plan.md',
+          filename: 'session-plan.md',
+          title: 'Session Plan',
+          properties: { 'Workspace View': 'Sessions' },
+        }),
+        makeEntry({
+          path: '/vault/Teaching/exam-bank.md',
+          filename: 'exam-bank.md',
+          title: 'Exam Bank',
+          properties: { 'Workspace View': 'Exams' },
+        }),
+      ],
+    })
+
+    expect(screen.getByText('Session Plan')).toBeInTheDocument()
+    expect(screen.getByText('Exam Bank')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sessions' }))
+
+    expect(screen.getByText('Session Plan')).toBeInTheDocument()
+    expect(screen.queryByText('Exam Bank')).not.toBeInTheDocument()
+  })
+
+  it('filters workspace entries by built-in status and type fallbacks when selecting shortcuts', () => {
+    renderManagedWorkspaceViewNoteList({
+      selectedLabDomain: 'ongoingProjects',
+      entries: [
+        makeEntry({
+          path: '/vault/Projects/Ongoing/active-protocol.md',
+          filename: 'active-protocol.md',
+          title: 'Active Protocol',
+          status: 'Active',
+        }),
+        makeEntry({
+          path: '/vault/Projects/Ongoing/decision-log.md',
+          filename: 'decision-log.md',
+          title: 'Decision Log',
+          properties: { Category: 'Decision' },
+        }),
+      ],
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Active' }))
+    expect(screen.getByText('Active Protocol')).toBeInTheDocument()
+    expect(screen.queryByText('Decision Log')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
+    expect(screen.getByText('Decision Log')).toBeInTheDocument()
+    expect(screen.queryByText('Active Protocol')).not.toBeInTheDocument()
+  })
+
+  it('filters lab-management group meetings by type and body text', () => {
+    renderManagedWorkspaceViewNoteList({
+      selectedLabDomain: 'labManagement',
+      entries: [
+        makeEntry({
+          path: '/vault/Lab Management/lab-retro.md',
+          filename: 'lab-retro.md',
+          title: 'Lab Retro',
+          isA: 'groupMeeting',
+          snippet: 'Agenda and follow-up items.',
+        }),
+        makeEntry({
+          path: '/vault/Lab Management/weekly-sync.md',
+          filename: 'weekly-sync.md',
+          title: 'Weekly Sync',
+          snippet: 'Weekly group meeting agenda covers milestones.',
+        }),
+        makeEntry({
+          path: '/vault/Lab Management/equipment-inventory.md',
+          filename: 'equipment-inventory.md',
+          title: 'Equipment Inventory',
+          isA: 'Equipment',
+          snippet: 'Microscope and freezer maintenance log.',
+        }),
+      ],
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Group Meeting' }))
+
+    expect(screen.getByText('Lab Retro')).toBeInTheDocument()
+    expect(screen.getByText('Weekly Sync')).toBeInTheDocument()
+    expect(screen.queryByText('Equipment Inventory')).not.toBeInTheDocument()
+  })
+
+  it('shows the workspace search placeholder when no research lab domain is selected', () => {
+    renderNoteList({
+      researchLabModeEnabled: true,
+    })
+
+    fireEvent.click(screen.getByTitle('Search notes'))
+
+    expect(screen.getByPlaceholderText('Search workspace...')).toBeInTheDocument()
+  })
+
+  it('does not show workspace view shortcuts outside research lab domain folders', () => {
+    renderNoteList({
+      researchLabModeEnabled: true,
+    })
+
+    expect(screen.queryByTestId('workspace-view-shortcuts')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['ongoingProjects', 'Projects/Ongoing', 'Search projects...'],
+    ['projectAcquisition', 'Projects/Acquisition', 'Search acquisition...'],
+    ['teaching', 'Teaching', 'Search teaching...'],
+    ['labManagement', 'Lab Management', 'Search lab management...'],
+  ] as const)('shows the %s search placeholder in research lab mode', (selectedLabDomain, folderPath, placeholder) => {
+    renderNoteList({
+      selection: { kind: 'folder', path: folderPath },
+      selectedLabDomain,
+      researchLabModeEnabled: true,
+    })
+
+    fireEvent.click(screen.getByTitle('Search notes'))
+
+    expect(screen.getByPlaceholderText(placeholder)).toBeInTheDocument()
+  })
+
+  it('hides the inbox title in research lab mode with a workspace fallback', () => {
+    renderNoteList({
+      selection: { kind: 'filter', filter: 'inbox' },
+      researchLabModeEnabled: true,
+    })
+
+    expect(screen.getByRole('heading', { name: 'Workspace' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Inbox' })).not.toBeInTheDocument()
+  })
+
+  it('preserves the inbox title outside research lab mode', () => {
+    renderNoteList({
+      selection: { kind: 'filter', filter: 'inbox' },
+    })
+
+    expect(screen.getByRole('heading', { name: 'Inbox' })).toBeInTheDocument()
   })
 
   it('filters section groups by type', () => {

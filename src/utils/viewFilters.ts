@@ -22,6 +22,10 @@ export function evaluateView(definition: ViewDefinition, entries: VaultEntry[]):
   return entries.filter((e) => !e.archived && evaluateGroup(definition.filters, e))
 }
 
+export function evaluateFilterGroup(group: FilterGroup, entry: VaultEntry): boolean {
+  return evaluateGroup(group, entry)
+}
+
 function evaluateGroup(group: FilterGroup, entry: VaultEntry): boolean {
   if ('all' in group) return group.all.every((node) => evaluateNode(node, entry))
   if ('any' in group) return group.any.some((node) => evaluateNode(node, entry))

@@ -192,7 +192,9 @@ export function ViewsSection({
 export function ResearchLabHomeSection({
   researchLabMode,
   selection,
+  selectedLabDomain,
   onSelect,
+  onSelectLabDomain,
   collapsed,
   onToggle,
   vaultRootPath,
@@ -200,7 +202,9 @@ export function ResearchLabHomeSection({
 }: {
   researchLabMode?: ResearchLabModeConfig | null
   selection: SidebarSelection
+  selectedLabDomain?: ResearchLabDomainKey | null
   onSelect: (selection: SidebarSelection) => void
+  onSelectLabDomain?: (domain: ResearchLabDomainKey | null) => void
   collapsed: boolean
   onToggle: () => void
   vaultRootPath?: string
@@ -228,8 +232,11 @@ export function ResearchLabHomeSection({
                 <NavItem
                   icon={item.icon}
                   label={translate(locale, item.labelKey)}
-                  isActive={isSelectionActive(selection, target)}
-                  onClick={() => onSelect(target)}
+                  isActive={selectedLabDomain === item.key || isSelectionActive(selection, target)}
+                  onClick={() => {
+                    onSelectLabDomain?.(item.key)
+                    onSelect(target)
+                  }}
                   compact
                   style={{ color: item.color }}
                 />

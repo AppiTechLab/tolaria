@@ -2,6 +2,7 @@ import { BulkActionBar } from '../BulkActionBar'
 import { FilterPills } from './FilterPills'
 import { NoteListHeader } from './NoteListHeader'
 import { EntityView, ListView } from './NoteListViews'
+import { Button } from '../ui/button'
 import type { useNoteListModel } from './useNoteListModel'
 
 type NoteListLayoutProps = ReturnType<typeof useNoteListModel> & {
@@ -249,6 +250,47 @@ function NoteListBody({
   )
 }
 
+function WorkspaceViewShortcutStrip({
+  showWorkspaceViewShortcuts,
+  selectedLabDomain,
+  workspaceViewShortcuts,
+  selectedWorkspaceView,
+  onSelectWorkspaceView,
+}: Pick<
+  NoteListLayoutProps,
+  | 'showWorkspaceViewShortcuts'
+  | 'selectedLabDomain'
+  | 'workspaceViewShortcuts'
+  | 'selectedWorkspaceView'
+  | 'onSelectWorkspaceView'
+>) {
+  if (!showWorkspaceViewShortcuts || !selectedLabDomain || workspaceViewShortcuts.length === 0) return null
+
+  return (
+    <div data-testid="workspace-view-shortcuts" className="border-b border-border bg-muted/20 px-3 py-3">
+      <div className="flex flex-wrap gap-2">
+        {workspaceViewShortcuts.map((shortcut) => {
+          const isSelected = selectedWorkspaceView?.domain === selectedLabDomain && selectedWorkspaceView.id === shortcut.id
+          return (
+            <Button
+              key={shortcut.id}
+              type="button"
+              variant={isSelected ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={isSelected}
+              data-testid={`workspace-view-shortcut-${shortcut.id}`}
+              className={isSelected ? 'h-8 rounded-full bg-primary/10 px-3 text-xs text-primary hover:bg-primary/15' : 'h-8 rounded-full px-3 text-xs'}
+              onClick={() => onSelectWorkspaceView?.({ domain: selectedLabDomain, id: shortcut.id })}
+            >
+              {shortcut.label}
+            </Button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function NoteListLayoutHeader({
   title,
   typeDocument,
@@ -264,6 +306,7 @@ function NoteListLayoutHeader({
   sidebarCollapsed,
   searchVisible,
   search,
+  searchPlaceholder,
   isSearching,
   searchInputRef,
   propertyPicker,
@@ -290,6 +333,7 @@ function NoteListLayoutHeader({
   | 'sidebarCollapsed'
   | 'searchVisible'
   | 'search'
+  | 'searchPlaceholder'
   | 'isSearching'
   | 'searchInputRef'
   | 'propertyPicker'
@@ -317,6 +361,7 @@ function NoteListLayoutHeader({
       sidebarCollapsed={sidebarCollapsed}
       searchVisible={searchVisible}
       search={search}
+      searchPlaceholder={searchPlaceholder}
       isSearching={isSearching}
       searchInputRef={searchInputRef}
       propertyPicker={propertyPicker}
@@ -381,6 +426,7 @@ export function NoteListLayout({
       onFocusCapture={handleNoteListPanelFocusCapture}
     >
       <NoteListLayoutHeader {...contentProps} />
+      <WorkspaceViewShortcutStrip {...contentProps} />
       <NoteListBody {...contentProps} />
       <NoteListFooter {...contentProps} />
     </div>

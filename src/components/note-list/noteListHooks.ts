@@ -1,5 +1,14 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import type { VaultEntry, SidebarSelection, ModifiedFile, NoteStatus, ViewDefinition, ViewFile } from '../../types'
+import type {
+  ModifiedFile,
+  NoteStatus,
+  ResearchLabDomainKey,
+  SelectedWorkspaceView,
+  SidebarSelection,
+  VaultEntry,
+  ViewDefinition,
+  ViewFile,
+} from '../../types'
 import {
   type SortOption, type SortDirection, type SortConfig, type NoteListFilter,
   getSortComparator, extractSortableProperties,
@@ -11,6 +20,7 @@ import type { InboxPeriod } from '../../types'
 import { buildTypeEntryMap } from '../../utils/typeColors'
 import {
   buildChangesEntries, filterByQuery, filterGroupsByQuery, createNoteStatusResolver,
+  filterEntriesBySelectedWorkspaceView,
   isDeletedNoteEntry, isModifiedEntry, routeNoteClick, toggleSetMember,
 } from './noteListUtils'
 import type { DeletedNoteEntry } from './noteListUtils'
@@ -115,6 +125,8 @@ interface NoteListDataParams {
   inboxPeriod?: InboxPeriod
   views?: ViewFile[]
   allNotesFileVisibility?: AllNotesFileVisibility
+  selectedLabDomain?: ResearchLabDomainKey | null
+  selectedWorkspaceView?: SelectedWorkspaceView | null
 }
 
 export function useNoteListData({
@@ -130,6 +142,8 @@ export function useNoteListData({
   inboxPeriod,
   views,
   allNotesFileVisibility,
+  selectedLabDomain = null,
+  selectedWorkspaceView = null,
 }: NoteListDataParams) {
   const isEntityView = selection.kind === 'entity'
   const isArchivedView = (selection.kind === 'filter' && selection.filter === 'archived') || subFilter === 'archived'
@@ -151,9 +165,16 @@ export function useNoteListData({
   })
 
   const searched = useMemo(() => {
-    const sorted = [...filteredEntries].sort(getSortComparator(listSort, listDirection))
+    const workspaceFilteredEntries = filterEntriesBySelectedWorkspaceView(
+      filteredEntries,
+      selection,
+      selectedLabDomain,
+      selectedWorkspaceView,
+      views,
+    )
+    const sorted = [...workspaceFilteredEntries].sort(getSortComparator(listSort, listDirection))
     return filterByQuery(sorted, query)
-  }, [filteredEntries, listSort, listDirection, query])
+  }, [filteredEntries, listDirection, listSort, query, selectedLabDomain, selectedWorkspaceView, selection, views])
 
   const searchedGroups = useMemo(() => {
     if (!entityEntry) return []

@@ -204,6 +204,37 @@ export interface ResearchLabModeConfig {
   folders: ResearchLabModeFolders
 }
 
+export type ResearchLabWorkspaceViewId =
+  | 'active'
+  | 'deliverables'
+  | 'meetings'
+  | 'risks'
+  | 'decisions'
+  | 'archived'
+  | 'ideas'
+  | 'calls'
+  | 'drafting'
+  | 'submitted'
+  | 'rejected'
+  | 'resubmissionCandidates'
+  | 'currentSemester'
+  | 'courses'
+  | 'sessions'
+  | 'exams'
+  | 'BachelorThesis'
+  | 'rubrics'
+  | 'groupMeeting'
+  | 'equipment'
+  | 'procedures'
+  | 'strategy'
+  | 'infrastructure'
+  | 'finance'
+
+export interface SelectedWorkspaceView {
+  domain: ResearchLabDomainKey
+  id: string
+}
+
 /** Vault-scoped UI configuration stored locally per vault path. */
 export type NoteLayout = 'centered' | 'left'
 
@@ -275,6 +306,8 @@ export interface ViewDefinition {
   order?: number | null
   sort: string | null
   listPropertiesDisplay?: string[]
+  /** Optional Lab Home group used to surface this saved view in Research Lab workspace shortcuts. */
+  labHomeGroup?: ResearchLabDomainKey | null
   filters: FilterGroup
 }
 

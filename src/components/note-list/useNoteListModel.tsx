@@ -5,6 +5,8 @@ import type {
   ModifiedFile,
   NoteStatus,
   InboxPeriod,
+  ResearchLabDomainKey,
+  SelectedWorkspaceView,
   ViewDefinition,
   ViewFile,
 } from '../../types'
@@ -16,7 +18,13 @@ import type { GitRepositoryOption } from '../../utils/gitRepositories'
 import { NoteItem } from '../NoteItem'
 import { prefetchNoteContent } from '../../hooks/useTabManagement'
 import type { MultiSelectState } from '../../hooks/useMultiSelect'
-import { isDeletedNoteEntry, resolveHeaderTitle, type DeletedNoteEntry } from './noteListUtils'
+import {
+  isDeletedNoteEntry,
+  resolveHeaderTitle,
+  resolveSearchPlaceholder,
+  resolveWorkspaceViewShortcuts,
+  type DeletedNoteEntry,
+} from './noteListUtils'
 import { filterEntriesByNoteListQuery, filterGroupsByNoteListQuery } from './noteListSearch'
 import { useNoteListSearchState } from './useNoteListSearchState'
 import {
@@ -156,6 +164,8 @@ interface UseNoteListContentParams {
   modifiedPathSet: Set<string>
   isInboxView: boolean
   selectedNotePath: string | null
+  selectedLabDomain?: ResearchLabDomainKey | null
+  selectedWorkspaceView?: SelectedWorkspaceView | null
   allNotesNoteListProperties?: string[] | null
   onUpdateAllNotesNoteListProperties?: (value: string[] | null) => void
   inboxNoteListProperties?: string[] | null
@@ -178,6 +188,8 @@ function useNoteListContent({
   modifiedPathSet,
   isInboxView,
   selectedNotePath,
+  selectedLabDomain,
+  selectedWorkspaceView,
   allNotesNoteListProperties,
   onUpdateAllNotesNoteListProperties,
   inboxNoteListProperties,
@@ -250,6 +262,8 @@ function useNoteListContent({
     inboxPeriod: effectiveInboxPeriod,
     views,
     allNotesFileVisibility,
+    selectedLabDomain,
+    selectedWorkspaceView,
   })
   const searchContext = useMemo(() => ({
     allEntries: entries,
@@ -468,6 +482,10 @@ export interface NoteListProps {
   entries: VaultEntry[]
   selection: SidebarSelection
   selectedNote: VaultEntry | null
+  selectedLabDomain?: ResearchLabDomainKey | null
+  selectedWorkspaceView?: SelectedWorkspaceView | null
+  onSelectWorkspaceView?: (selection: SelectedWorkspaceView) => void
+  researchLabModeEnabled?: boolean
   loading?: boolean
   noteListFilter: NoteListFilter
   onNoteListFilterChange: (filter: NoteListFilter) => void
@@ -508,6 +526,10 @@ function buildNoteListLayoutModel(params: {
   selection: SidebarSelection
   views?: ViewFile[]
   sidebarCollapsed?: boolean
+  researchLabModeEnabled?: boolean
+  selectedLabDomain?: ResearchLabDomainKey | null
+  selectedWorkspaceView?: SelectedWorkspaceView | null
+  onSelectWorkspaceView?: (selection: SelectedWorkspaceView) => void
   loading: boolean
   modifiedFilesError?: string | null
   gitRepositories?: GitRepositoryOption[]
@@ -527,7 +549,14 @@ function buildNoteListLayoutModel(params: {
   }
 }) {
   return {
-    title: resolveHeaderTitle(params.selection, params.content.typeDocument, params.views, params.locale),
+    title: resolveHeaderTitle(
+      params.selection,
+      params.content.typeDocument,
+      params.views,
+      params.locale,
+      params.researchLabModeEnabled,
+      params.selectedLabDomain,
+    ),
     loading: params.loading,
     locale: params.locale,
     typeDocument: params.content.typeDocument,
@@ -538,6 +567,24 @@ function buildNoteListLayoutModel(params: {
     sidebarCollapsed: params.sidebarCollapsed,
     searchVisible: params.content.searchVisible,
     search: params.content.search,
+    searchPlaceholder: resolveSearchPlaceholder(
+      params.locale,
+      params.researchLabModeEnabled,
+      params.selectedLabDomain,
+    ),
+    showWorkspaceViewShortcuts: Boolean(
+      params.researchLabModeEnabled
+      && params.selectedLabDomain
+      && params.selection.kind === 'folder'
+    ),
+    selectedLabDomain: params.selectedLabDomain ?? null,
+    workspaceViewShortcuts: resolveWorkspaceViewShortcuts(
+      params.selectedLabDomain,
+      params.views,
+      params.locale,
+    ),
+    selectedWorkspaceView: params.selectedWorkspaceView ?? null,
+    onSelectWorkspaceView: params.onSelectWorkspaceView,
     isSearching: params.content.isSearching,
     searchInputRef: params.content.searchInputRef,
     propertyPicker: params.content.propertyPicker,
@@ -590,6 +637,10 @@ export function useNoteListModel({
   entries,
   selection,
   selectedNote,
+  selectedLabDomain = null,
+  selectedWorkspaceView = null,
+  onSelectWorkspaceView,
+  researchLabModeEnabled = false,
   loading = false,
   noteListFilter,
   onNoteListFilterChange,
@@ -636,6 +687,8 @@ export function useNoteListModel({
     modifiedPathSet,
     isInboxView,
     selectedNotePath,
+    selectedLabDomain,
+    selectedWorkspaceView,
     allNotesNoteListProperties,
     onUpdateAllNotesNoteListProperties,
     inboxNoteListProperties,
@@ -714,6 +767,10 @@ export function useNoteListModel({
     selection,
     views,
     sidebarCollapsed,
+    researchLabModeEnabled,
+    selectedLabDomain,
+    selectedWorkspaceView,
+    onSelectWorkspaceView,
     loading,
     onOpenType: onReplaceActiveTab,
     modifiedFilesError,

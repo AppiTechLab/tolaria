@@ -33,6 +33,12 @@ pub struct ViewDefinition {
         skip_serializing_if = "Vec::is_empty"
     )]
     pub list_properties_display: Vec<String>,
+    #[serde(
+        default,
+        rename = "labHomeGroup",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub lab_home_group: Option<String>,
     pub filters: FilterGroup,
 }
 

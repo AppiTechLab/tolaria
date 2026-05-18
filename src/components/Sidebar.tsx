@@ -1,6 +1,12 @@
 import { useCallback, memo } from 'react'
 import type {
-  VaultEntry, FolderNode, ResearchLabModeConfig, SidebarSelection, ViewDefinition, ViewFile,
+  FolderNode,
+  ResearchLabDomainKey,
+  ResearchLabModeConfig,
+  SidebarSelection,
+  VaultEntry,
+  ViewDefinition,
+  ViewFile,
 } from '../types'
 import {
   KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent,
@@ -37,7 +43,9 @@ import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 interface SidebarProps {
   entries: VaultEntry[]
   selection: SidebarSelection
+  selectedLabDomain?: ResearchLabDomainKey | null
   onSelect: (selection: SidebarSelection) => void
+  onSelectLabDomain?: (domain: ResearchLabDomainKey | null) => void
   onSelectNote?: (entry: VaultEntry) => void
   onCreateType?: (type: string) => void
   onCreateNewType?: () => void
@@ -84,7 +92,9 @@ interface SidebarNavigationProps extends Pick<
   SidebarProps,
   | 'entries'
   | 'selection'
+  | 'selectedLabDomain'
   | 'onSelect'
+  | 'onSelectLabDomain'
   | 'onSelectFavorite'
   | 'onReorderFavorites'
   | 'views'
@@ -378,7 +388,9 @@ function SidebarTopNavigation(props: SidebarNavigationProps) {
       <ResearchLabHomeSection
         researchLabMode={props.researchLabMode}
         selection={props.selection}
+        selectedLabDomain={props.selectedLabDomain ?? null}
         onSelect={props.onSelect}
+        onSelectLabDomain={props.onSelectLabDomain}
         collapsed={props.groupCollapsed.labHome}
         onToggle={() => props.toggleGroup('labHome')}
         vaultRootPath={props.vaultRootPath}

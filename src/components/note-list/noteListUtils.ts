@@ -1,7 +1,19 @@
-import type { VaultEntry, SidebarSelection, SidebarFilter, ModifiedFile, NoteStatus, ViewFile } from '../../types'
+import type {
+  FilterGroup,
+  ModifiedFile,
+  NoteStatus,
+  ResearchLabDomainKey,
+  ResearchLabWorkspaceViewId,
+  SelectedWorkspaceView,
+  SidebarFilter,
+  SidebarSelection,
+  VaultEntry,
+  ViewFile,
+} from '../../types'
 import type { RelationshipGroup } from '../../utils/noteListHelpers'
-import { translate, type AppLocale } from '../../lib/i18n'
+import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import { filenameStemToTitle } from '../../utils/noteTitle'
+import { evaluateFilterGroup } from '../../utils/viewFilters'
 
 export interface DeletedNoteEntry extends VaultEntry {
   __deletedNotePreview: true
@@ -18,6 +30,195 @@ const FILTER_TITLE_KEYS = {
   pulse: 'noteList.title.history',
 } as const
 
+const LAB_DOMAIN_TITLE_KEYS: Record<ResearchLabDomainKey, TranslationKey> = {
+  ongoingProjects: 'labHome.section.ongoingProjects.title',
+  projectAcquisition: 'labHome.section.projectAcquisition.title',
+  teaching: 'labHome.section.teaching.title',
+  labManagement: 'labHome.section.labManagement.title',
+}
+
+const LAB_DOMAIN_SEARCH_PLACEHOLDER_KEYS: Record<ResearchLabDomainKey, TranslationKey> = {
+  ongoingProjects: 'noteList.searchPlaceholderProjects',
+  projectAcquisition: 'noteList.searchPlaceholderAcquisition',
+  teaching: 'noteList.searchPlaceholderTeaching',
+  labManagement: 'noteList.searchPlaceholderLabManagement',
+}
+
+export interface WorkspaceViewShortcut {
+  id: string
+  label: string
+  filters: FilterGroup
+}
+
+interface WorkspaceViewShortcutDefinition {
+  id: ResearchLabWorkspaceViewId
+  labelKey: TranslationKey
+  filters: FilterGroup
+}
+
+interface WorkspaceViewSemanticMatch {
+  fields: readonly string[]
+  values: readonly unknown[]
+  op?: 'contains'
+}
+
+const WORKSPACE_VIEW_IDENTIFIER_FIELDS = [
+  'Workspace View',
+  'Workspace View Id',
+  'workspace_view',
+  'workspaceView',
+] as const
+
+function uniqueValues<T>(values: readonly T[]): T[] {
+  return [...new Set(values)]
+}
+
+function humanizeWorkspaceViewId(id: ResearchLabWorkspaceViewId): string {
+  return id.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()
+}
+
+function workspaceViewIdentifierValues(
+  id: ResearchLabWorkspaceViewId,
+  aliases: readonly string[] = [],
+): string[] {
+  const humanized = humanizeWorkspaceViewId(id)
+  return uniqueValues([
+    id,
+    humanized,
+    humanized.replace(/\s+/g, '-'),
+    humanized.replace(/\s+/g, '_'),
+    ...aliases,
+  ])
+}
+
+function buildFieldValueFilter(fields: readonly string[], values: readonly unknown[]): FilterGroup {
+  const resolvedValues = uniqueValues(values)
+  return {
+    any: fields.map((field) => (
+      resolvedValues.length === 1
+        ? { field, op: 'equals' as const, value: resolvedValues[0] }
+        : { field, op: 'any_of' as const, value: resolvedValues }
+    )),
+  }
+}
+
+function buildSemanticMatchFilter(match: WorkspaceViewSemanticMatch): FilterGroup {
+  if (match.op === 'contains') {
+    return {
+      any: match.fields.flatMap((field) => match.values.map((value) => ({
+        field,
+        op: 'contains' as const,
+        value,
+      }))),
+    }
+  }
+
+  return buildFieldValueFilter(match.fields, match.values)
+}
+
+function createWorkspaceViewShortcut(
+  id: ResearchLabWorkspaceViewId,
+  labelKey: TranslationKey,
+  aliases: readonly string[] = [],
+  semanticMatches: readonly WorkspaceViewSemanticMatch[] = [],
+): WorkspaceViewShortcutDefinition {
+  return {
+    id,
+    labelKey,
+    filters: {
+      any: [
+        buildFieldValueFilter(WORKSPACE_VIEW_IDENTIFIER_FIELDS, workspaceViewIdentifierValues(id, aliases)),
+        ...semanticMatches.map((match) => buildSemanticMatchFilter(match)),
+      ],
+    },
+  }
+}
+
+const LAB_DOMAIN_WORKSPACE_VIEW_SHORTCUTS: Record<ResearchLabDomainKey, readonly WorkspaceViewShortcutDefinition[]> = {
+  ongoingProjects: [
+    createWorkspaceViewShortcut('active', 'noteList.workspaceView.ongoingProjects.active', ['Active'], [
+      { fields: ['status'], values: ['Active', 'In Progress'] },
+    ]),
+    createWorkspaceViewShortcut('deliverables', 'noteList.workspaceView.ongoingProjects.deliverables', ['Deliverable', 'Deliverables'], [
+      { fields: ['type', 'Category'], values: ['Deliverable', 'Deliverables'] },
+    ]),
+    createWorkspaceViewShortcut('meetings', 'noteList.workspaceView.ongoingProjects.meetings', ['Meeting', 'Meetings'], [
+      { fields: ['type', 'Category'], values: ['Meeting', 'Meetings', 'Event'] },
+    ]),
+    createWorkspaceViewShortcut('risks', 'noteList.workspaceView.ongoingProjects.risks', ['Risk', 'Risks'], [
+      { fields: ['type', 'Category'], values: ['Risk', 'Risks'] },
+    ]),
+    createWorkspaceViewShortcut('decisions', 'noteList.workspaceView.ongoingProjects.decisions', ['Decision', 'Decisions'], [
+      { fields: ['type', 'Category'], values: ['Decision', 'Decisions'] },
+    ]),
+    createWorkspaceViewShortcut('archived', 'noteList.workspaceView.ongoingProjects.archived', ['Archived', 'Archive'], [
+      { fields: ['status', 'Stage', 'Category'], values: ['Archived', 'Archive'] },
+      { fields: ['archived'], values: [true] },
+    ]),
+  ],
+  projectAcquisition: [
+    createWorkspaceViewShortcut('ideas', 'noteList.workspaceView.projectAcquisition.ideas', ['Idea', 'Ideas'], [
+      { fields: ['Stage', 'status', 'Category'], values: ['Idea', 'Ideas'] },
+    ]),
+    createWorkspaceViewShortcut('calls', 'noteList.workspaceView.projectAcquisition.calls', ['Call', 'Calls'], [
+      { fields: ['type', 'Stage', 'Category'], values: ['Call', 'Calls'] },
+    ]),
+    createWorkspaceViewShortcut('drafting', 'noteList.workspaceView.projectAcquisition.drafting', ['Draft', 'Drafting'], [
+      { fields: ['Stage', 'status'], values: ['Draft', 'Drafting'] },
+    ]),
+    createWorkspaceViewShortcut('submitted', 'noteList.workspaceView.projectAcquisition.submitted', ['Submitted'], [
+      { fields: ['Stage', 'status'], values: ['Submitted'] },
+    ]),
+    createWorkspaceViewShortcut('rejected', 'noteList.workspaceView.projectAcquisition.rejected', ['Rejected'], [
+      { fields: ['Stage', 'status'], values: ['Rejected'] },
+    ]),
+    createWorkspaceViewShortcut('resubmissionCandidates', 'noteList.workspaceView.projectAcquisition.resubmissionCandidates', ['Resubmission Candidate', 'Resubmission Candidates'], [
+      { fields: ['Stage', 'status', 'Category'], values: ['Resubmission Candidate', 'Resubmission Candidates'] },
+    ]),
+  ],
+  teaching: [
+    createWorkspaceViewShortcut('currentSemester', 'noteList.workspaceView.teaching.currentSemester', ['Current Semester', 'Current'], [
+      { fields: ['Semester', 'Academic Term', 'Term', 'status'], values: ['Current', 'Current Semester', 'Active'] },
+    ]),
+    createWorkspaceViewShortcut('courses', 'noteList.workspaceView.teaching.courses', ['Course', 'Courses'], [
+      { fields: ['type', 'Category'], values: ['Course', 'Courses'] },
+    ]),
+    createWorkspaceViewShortcut('sessions', 'noteList.workspaceView.teaching.sessions', ['Session', 'Sessions'], [
+      { fields: ['type', 'Category'], values: ['Session', 'Sessions'] },
+    ]),
+    createWorkspaceViewShortcut('exams', 'noteList.workspaceView.teaching.exams', ['Exam', 'Exams'], [
+      { fields: ['type', 'Category'], values: ['Exam', 'Exams'] },
+    ]),
+    createWorkspaceViewShortcut('BachelorThesis', 'noteList.workspaceView.teaching.studentProjects', ['Bachelor Thesis', 'Bachelor Theses'], [
+      { fields: ['type', 'Category'], values: ['Bachelor Thesis', 'Bachelor Theses'] },
+    ]),
+    createWorkspaceViewShortcut('rubrics', 'noteList.workspaceView.teaching.rubrics', ['Rubric', 'Rubrics'], [
+      { fields: ['type', 'Category'], values: ['Rubric', 'Rubrics'] },
+    ]),
+  ],
+  labManagement: [
+    createWorkspaceViewShortcut('groupMeeting', 'noteList.workspaceView.labManagement.groupMeeting' as TranslationKey, ['GroupMeeting'], [
+      { fields: ['type', 'Category'], values: ['groupMeeting', 'GroupMeeting', 'Group Meeting'] },
+      { fields: ['body'], values: ['Weekly group meeting'], op: 'contains' },
+    ]),
+    createWorkspaceViewShortcut('equipment', 'noteList.workspaceView.labManagement.equipment', ['Equipment'], [
+      { fields: ['type', 'Category'], values: ['Equipment'] },
+    ]),
+    createWorkspaceViewShortcut('procedures', 'noteList.workspaceView.labManagement.procedures', ['Procedure', 'Procedures'], [
+      { fields: ['type', 'Category'], values: ['Procedure', 'Procedures'] },
+    ]),
+    createWorkspaceViewShortcut('strategy', 'noteList.workspaceView.labManagement.strategy', ['Strategy'], [
+      { fields: ['type', 'Category'], values: ['Strategy'] },
+    ]),
+    createWorkspaceViewShortcut('infrastructure', 'noteList.workspaceView.labManagement.infrastructure', ['Infrastructure'], [
+      { fields: ['type', 'Category'], values: ['Infrastructure'] },
+    ]),
+    createWorkspaceViewShortcut('finance', 'noteList.workspaceView.labManagement.finance', ['Finance'], [
+      { fields: ['type', 'Category'], values: ['Finance'] },
+    ]),
+  ],
+}
+
 type LocalizedFilter = keyof typeof FILTER_TITLE_KEYS
 
 function isLocalizedFilter(filter: SidebarFilter): filter is LocalizedFilter {
@@ -30,15 +231,100 @@ function resolveSelectionFilterTitle(selection: SidebarSelection, locale: AppLoc
   return translate(locale, FILTER_TITLE_KEYS[selection.filter])
 }
 
-export function resolveHeaderTitle(selection: SidebarSelection, typeDocument: VaultEntry | null, views?: ViewFile[], locale: AppLocale = 'en'): string {
+export function resolveHeaderTitle(
+  selection: SidebarSelection,
+  typeDocument: VaultEntry | null,
+  views?: ViewFile[],
+  locale: AppLocale = 'en',
+  researchLabModeEnabled = false,
+  selectedLabDomain: ResearchLabDomainKey | null = null,
+): string {
   if (selection.kind === 'view') {
     const view = views?.find((v) => v.filename === selection.filename)
     return view?.definition.name ?? translate(locale, 'noteList.title.view')
   }
   if (selection.kind === 'entity') return selection.entry.title
   if (typeDocument) return typeDocument.title
+  if (researchLabModeEnabled && selectedLabDomain && selection.kind === 'folder') {
+    return translate(locale, LAB_DOMAIN_TITLE_KEYS[selectedLabDomain])
+  }
+  if (
+    researchLabModeEnabled
+    && selection.kind === 'filter'
+    && (selection.filter === 'all' || selection.filter === 'inbox')
+  ) {
+    return translate(locale, 'noteList.title.workspace')
+  }
 
   return resolveSelectionFilterTitle(selection, locale) ?? translate(locale, 'noteList.title.notes')
+}
+
+export function resolveSearchPlaceholder(
+  locale: AppLocale = 'en',
+  researchLabModeEnabled = false,
+  selectedLabDomain: ResearchLabDomainKey | null = null,
+): string {
+  if (!researchLabModeEnabled) return translate(locale, 'noteList.searchPlaceholder')
+  if (!selectedLabDomain) return translate(locale, 'noteList.searchPlaceholderWorkspace')
+  return translate(locale, LAB_DOMAIN_SEARCH_PLACEHOLDER_KEYS[selectedLabDomain])
+}
+
+export function resolveWorkspaceViewShortcuts(
+  selectedLabDomain: ResearchLabDomainKey | null = null,
+  views: readonly ViewFile[] = [],
+  locale: AppLocale = 'en',
+): readonly WorkspaceViewShortcut[] {
+  if (!selectedLabDomain) return []
+  const assignedViews = views
+    .filter((view) => view.definition.labHomeGroup === selectedLabDomain)
+    .sort((left, right) => {
+      const order = (left.definition.order ?? Number.MAX_SAFE_INTEGER)
+        - (right.definition.order ?? Number.MAX_SAFE_INTEGER)
+      return order !== 0 ? order : left.filename.localeCompare(right.filename)
+    })
+
+  if (assignedViews.length > 0) {
+    return assignedViews.map((view) => ({
+      id: view.filename,
+      label: view.definition.name,
+      filters: view.definition.filters,
+    }))
+  }
+
+  return LAB_DOMAIN_WORKSPACE_VIEW_SHORTCUTS[selectedLabDomain].map((shortcut) => ({
+    id: shortcut.id,
+    label: translate(locale, shortcut.labelKey),
+    filters: shortcut.filters,
+  }))
+}
+
+function resolveActiveWorkspaceViewShortcut(
+  selection: SidebarSelection,
+  selectedLabDomain: ResearchLabDomainKey | null,
+  selectedWorkspaceView: SelectedWorkspaceView | null,
+  views: readonly ViewFile[] = [],
+): WorkspaceViewShortcut | null {
+  if (selection.kind !== 'folder' || !selectedLabDomain || !selectedWorkspaceView) return null
+  if (selectedWorkspaceView.domain !== selectedLabDomain) return null
+  return resolveWorkspaceViewShortcuts(selectedLabDomain, views)
+    .find((shortcut) => shortcut.id === selectedWorkspaceView.id) ?? null
+}
+
+export function filterEntriesBySelectedWorkspaceView(
+  entries: VaultEntry[],
+  selection: SidebarSelection,
+  selectedLabDomain: ResearchLabDomainKey | null,
+  selectedWorkspaceView: SelectedWorkspaceView | null,
+  views: readonly ViewFile[] = [],
+): VaultEntry[] {
+  const activeShortcut = resolveActiveWorkspaceViewShortcut(
+    selection,
+    selectedLabDomain,
+    selectedWorkspaceView,
+    views,
+  )
+  if (!activeShortcut) return entries
+  return entries.filter((entry) => evaluateFilterGroup(activeShortcut.filters, entry))
 }
 
 function searchableTitle(entry: { title?: unknown }): string {

@@ -82,7 +82,18 @@ import { DeleteProgressNotice } from './components/DeleteProgressNotice'
 import { UpdateBanner } from './components/UpdateBanner'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from './mock-tauri'
-import type { SidebarSelection, InboxPeriod, ModifiedFile, VaultEntry, ViewDefinition, ViewFile, WorkspaceIdentity } from './types'
+import type {
+  InboxPeriod,
+  ModifiedFile,
+  ResearchLabDomainKey,
+  ResearchLabModeConfig,
+  SelectedWorkspaceView,
+  SidebarSelection,
+  VaultEntry,
+  ViewDefinition,
+  ViewFile,
+  WorkspaceIdentity,
+} from './types'
 import type { Tab as EditorTab } from './hooks/useTabManagement'
 import type { NoteListItem } from './utils/ai-context'
 import { initializeNoteProperties } from './utils/initializeNoteProperties'
@@ -134,6 +145,31 @@ import { useGitFileWorkflows } from './hooks/useGitFileWorkflows'
 import './App.css'
 
 const ACTIVE_EDITOR_SURFACE_SELECTOR = '.editor__blocknote-container, .raw-editor-codemirror'
+const RESEARCH_LAB_DOMAIN_KEYS: readonly ResearchLabDomainKey[] = [
+  'ongoingProjects',
+  'projectAcquisition',
+  'teaching',
+  'labManagement',
+]
+
+function resolveSelectedLabDomain(
+  selection: SidebarSelection,
+  researchLabMode: ResearchLabModeConfig | null | undefined,
+  vaultRootPath: string,
+): ResearchLabDomainKey | null {
+  if (researchLabMode?.enabled !== true || selection.kind !== 'folder') return null
+
+  const selectedPath = normalizeVaultRelativePath(selection.path)
+  if (!selectedPath) return null
+
+  for (const key of RESEARCH_LAB_DOMAIN_KEYS) {
+    const mappedPath = normalizeVaultRelativePath(researchLabMode.folders[key])
+    if (!mappedPath || mappedPath !== selectedPath) continue
+    if (!vaultRootPath || !selection.rootPath || selection.rootPath === vaultRootPath) return key
+  }
+
+  return null
+}
 
 function isActiveElementInsideEditorSurface(): boolean {
   const activeElement = document.activeElement
@@ -228,6 +264,8 @@ function shouldPreserveViewRootPath(views: ViewFile[], editingRootPath?: string)
 function App() {
   const noteWindowParams = useMemo(() => isNoteWindow() ? getNoteWindowParams() : null, [])
   const [selection, setSelection] = useState<SidebarSelection>(DEFAULT_SELECTION)
+  const [selectedLabDomain, setSelectedLabDomain] = useState<ResearchLabDomainKey | null>(null)
+  const [selectedWorkspaceView, setSelectedWorkspaceView] = useState<SelectedWorkspaceView | null>(null)
   const [noteListFilter, setNoteListFilter] = useState<NoteListFilter>('open')
   const selectionRef = useRef<SidebarSelection>(DEFAULT_SELECTION)
   const neighborhoodHistoryRef = useRef<SidebarSelection[]>([])
@@ -419,6 +457,10 @@ function App() {
   const researchLabModeEnabled = vaultConfig.researchLabMode?.enabled === true
   const effectiveSelection = sanitizeSelectionForOrganization(selection, vaultConfig.inbox?.explicitOrganization)
   const isChangesSelection = effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'changes'
+
+  useEffect(() => {
+    setSelectedLabDomain(resolveSelectedLabDomain(effectiveSelection, vaultConfig.researchLabMode, resolvedPath))
+  }, [effectiveSelection, resolvedPath, vaultConfig.researchLabMode])
 
   useSelectionSanitizer({
     effectiveSelection,
@@ -1711,7 +1753,7 @@ function App() {
           {sidebarVisible && (
             <>
               <div className="app__sidebar" style={{ width: layout.sidebarWidth }}>
-                <Sidebar entries={visibleEntries} folders={vault.folders} views={vault.views} selection={effectiveSelection} onSelect={handleSetSelection} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={!researchLabModeEnabled && explicitOrganizationEnabled} inboxCount={inboxCount} researchLabMode={vaultConfig.researchLabMode ?? null} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} onCollapse={handleCollapseSidebar} onToggleNoteList={noteListVisible ? handleCollapseNoteList : handleExpandNoteList} noteListCollapsed={!noteListVisible} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} />
+                <Sidebar entries={visibleEntries} folders={vault.folders} views={vault.views} selection={effectiveSelection} selectedLabDomain={selectedLabDomain} onSelect={handleSetSelection} onSelectLabDomain={setSelectedLabDomain} onSelectNote={notes.handleSelectNote} onSelectFavorite={handleOpenFavorite} onReorderFavorites={entryActions.handleReorderFavorites} onCreateType={notes.handleCreateNoteImmediate} onCreateNewType={dialogs.openCreateType} onCustomizeType={entryActions.handleCustomizeType} onUpdateTypeTemplate={entryActions.handleUpdateTypeTemplate} onReorderSections={entryActions.handleReorderSections} onRenameSection={entryActions.handleRenameSection} onDeleteType={handleDeleteType} onToggleTypeVisibility={entryActions.handleToggleTypeVisibility} onCreateFolder={handleCreateFolder} onRenameFolder={folderActions.renameFolder} onDeleteFolder={folderActions.requestDeleteFolder} folderFileActions={fileActions.folderActions} renamingFolderPath={folderActions.renamingFolderPath} onStartRenameFolder={folderActions.startFolderRename} onCancelRenameFolder={folderActions.cancelFolderRename} onCreateView={dialogs.openCreateView} onEditView={handleEditView} onDeleteView={handleDeleteView} onUpdateViewDefinition={handleSidebarUpdateViewDefinition} onReorderViews={canReorderSavedViews ? viewOrdering.onReorderViews : undefined} showInbox={!researchLabModeEnabled && explicitOrganizationEnabled} inboxCount={inboxCount} researchLabMode={vaultConfig.researchLabMode ?? null} allNotesFileVisibility={allNotesFileVisibility} pluralizeTypeLabels={settings.sidebar_type_pluralization_enabled ?? true} onCollapse={handleCollapseSidebar} onToggleNoteList={noteListVisible ? handleCollapseNoteList : handleExpandNoteList} noteListCollapsed={!noteListVisible} onGoBack={handleGoBack} onGoForward={handleGoForward} canGoBack={canGoBack} canGoForward={canGoForward} locale={appLocale} loading={isVaultContentLoading} vaultRootPath={resolvedPath} />
               </div>
               <ResizeHandle onResize={layout.handleSidebarResize} />
             </>
@@ -1728,7 +1770,7 @@ function App() {
                     <LabHomeView locale={appLocale} rootPath={resolvedPath} entries={visibleEntries} folders={vault.folders} researchLabMode={vaultConfig.researchLabMode ?? null} onOpenFolder={handleOpenResearchLabFolder} onCreateFolder={handleCreateFolder} />
                   )
                 ) : (
-                  <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!sidebarVisible} onCollapseNoteList={!sidebarVisible ? handleCollapseNoteList : undefined} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={noteListOpenNote} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
+                  <NoteList entries={visibleEntries} selection={effectiveSelection} selectedNote={activeTab?.entry ?? null} selectedLabDomain={selectedLabDomain} selectedWorkspaceView={selectedWorkspaceView} onSelectWorkspaceView={setSelectedWorkspaceView} researchLabModeEnabled={researchLabModeEnabled} loading={isVaultContentLoading} noteListFilter={noteListFilter} onNoteListFilterChange={setNoteListFilter} inboxPeriod={inboxPeriod} modifiedFiles={noteListModifiedFiles} modifiedFilesError={noteListModifiedFilesError} gitRepositories={gitRepositories} selectedGitRepositoryPath={gitSurfaces.changesRepositoryPath} onGitRepositoryChange={gitSurfaces.setChangesRepositoryPath} getNoteStatus={vault.getNoteStatus} sidebarCollapsed={!sidebarVisible} onCollapseNoteList={!sidebarVisible ? handleCollapseNoteList : undefined} onSelectNote={notes.handleSelectNote} onReplaceActiveTab={noteListOpenNote} onEnterNeighborhood={handleEnterNeighborhood} onCreateNote={notes.handleCreateNoteImmediate} onBulkOrganize={explicitOrganizationEnabled ? bulkActions.handleBulkOrganize : undefined} onBulkArchive={bulkActions.handleBulkArchive} onBulkDeletePermanently={deleteActions.handleBulkDeletePermanently} onUpdateTypeSort={notes.handleUpdateFrontmatter} onUpdateViewDefinition={handleUpdateViewDefinition} updateEntry={vault.updateEntry} onOpenInNewWindow={handleOpenEntryInNewWindow} onDiscardFile={handleDiscardFile} onOpenDeletedNote={handleOpenDeletedNote} allNotesNoteListProperties={vaultConfig.allNotes?.noteListProperties ?? null} onUpdateAllNotesNoteListProperties={handleUpdateAllNotesNoteListProperties} inboxNoteListProperties={vaultConfig.inbox?.noteListProperties ?? null} onUpdateInboxNoteListProperties={handleUpdateInboxNoteListProperties} views={vault.views} visibleNotesRef={visibleNotesRef} allNotesFileVisibility={allNotesFileVisibility} multiSelectionCommandRef={multiSelectionCommandRef} locale={appLocale} />
                 )}
               </div>
               <ResizeHandle onResize={layout.handleNoteListResize} />
@@ -1838,7 +1880,7 @@ function App() {
           onSelectType={noteRetargetingUi.selectType}
           onSelectFolder={noteRetargetingUi.selectFolder}
         />
-        <CreateViewDialog open={dialogs.showCreateViewDialog} onClose={dialogs.closeCreateView} onCreate={handleCreateOrUpdateView} availableFields={availableFields} locale={appLocale} editingView={dialogs.editingView?.definition ?? null} />
+        <CreateViewDialog open={dialogs.showCreateViewDialog} onClose={dialogs.closeCreateView} onCreate={handleCreateOrUpdateView} availableFields={availableFields} locale={appLocale} researchLabModeEnabled={researchLabModeEnabled} editingView={dialogs.editingView?.definition ?? null} />
         <CommitDialog
           open={commitFlow.showCommitDialog}
           modifiedCount={commitModifiedFiles.length}

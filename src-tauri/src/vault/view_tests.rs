@@ -20,6 +20,7 @@ mod tests {
             order: None,
             sort: None,
             list_properties_display: Vec::new(),
+            lab_home_group: None,
             filters: FilterGroup::All(vec![FilterNode::Condition(FilterCondition {
                 field: "type".to_string(),
                 op: FilterOp::Equals,
@@ -57,6 +58,21 @@ filters:
             _ => panic!("Expected All group"),
         }
     }
+
+        #[test]
+        fn test_parse_lab_home_group() {
+                let yaml = r#"
+name: Active Projects
+labHomeGroup: ongoingProjects
+filters:
+    all:
+        - field: type
+            op: equals
+            value: Project
+"#;
+                let def: ViewDefinition = serde_yaml::from_str(yaml).unwrap();
+                assert_eq!(def.lab_home_group.as_deref(), Some("ongoingProjects"));
+        }
 
     #[test]
     fn test_evaluate_equals() {

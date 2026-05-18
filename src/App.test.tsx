@@ -1328,6 +1328,59 @@ describe('App', () => {
     })
   })
 
+  it('updates the workspace title and sidebar highlight when selecting a research lab domain', async () => {
+    const researchLabConfig = JSON.stringify({
+      zoom: null,
+      view_mode: null,
+      editor_mode: null,
+      tag_colors: null,
+      status_colors: null,
+      property_display_modes: null,
+      inbox: { noteListProperties: null, explicitOrganization: false },
+      researchLabMode: {
+        enabled: true,
+        folders: {
+          ongoingProjects: 'Projects/Ongoing',
+          projectAcquisition: 'Projects/Acquisition',
+          teaching: 'Teaching',
+          labManagement: 'Lab Management',
+          templates: 'Templates',
+          views: 'views',
+          aiPrompts: 'AI Prompts',
+          archive: 'Archive',
+        },
+      },
+    })
+    localStorage.setItem('laputa:vault-config:/vault', researchLabConfig)
+
+    render(<App />)
+
+    await waitFor(() => {
+      expect(within(screen.getByTestId('sidebar-top-nav')).queryByText('Inbox')).not.toBeInTheDocument()
+      expect(screen.getByTestId('research-lab-sidebar-section')).toBeInTheDocument()
+    })
+
+    const teachingItem = screen.getByText('Teaching').closest('[class*="cursor-pointer"]') as HTMLElement
+    fireEvent.click(teachingItem)
+
+    const noteListContainer = await screen.findByTestId('note-list-container')
+    await waitFor(() => {
+      expect(getHeaderForNoteList(noteListContainer)).toHaveTextContent('Teaching')
+    })
+    expect(screen.getByRole('button', { name: 'Sessions' })).toBeInTheDocument()
+    fireEvent.click(screen.getByTitle('Search notes'))
+    expect(screen.getByPlaceholderText('Search teaching...')).toBeInTheDocument()
+    expect(teachingItem).toHaveClass('bg-primary/10', 'text-primary')
+
+    const sessionsShortcut = screen.getByRole('button', { name: 'Sessions' })
+    const coursesShortcut = screen.getByRole('button', { name: 'Courses' })
+    fireEvent.click(sessionsShortcut)
+    expect(sessionsShortcut).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(coursesShortcut)
+    expect(coursesShortcut).toHaveAttribute('aria-pressed', 'true')
+    expect(sessionsShortcut).toHaveAttribute('aria-pressed', 'false')
+  })
+
   it('auto-advances to the next inbox item after organizing when the setting is enabled', async () => {
     configureNeighborhoodVault()
     mockCommandResults.get_settings = createSettings({ auto_advance_inbox_after_organize: true })

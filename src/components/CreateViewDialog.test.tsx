@@ -36,6 +36,11 @@ describe('CreateViewDialog', () => {
     expect(screen.getByText('Save')).toBeInTheDocument()
   })
 
+  it('keeps the Lab Home assignment control hidden outside research lab mode', () => {
+    render(<CreateViewDialog {...defaultProps} editingView={makeEditingView()} />)
+    expect(screen.queryByRole('combobox', { name: 'Lab Home' })).not.toBeInTheDocument()
+  })
+
   it('pre-populates name field in edit mode', () => {
     render(<CreateViewDialog {...defaultProps} editingView={makeEditingView()} />)
     const input = screen.getByPlaceholderText(/Active Projects|Reading List/i)
@@ -56,6 +61,30 @@ describe('CreateViewDialog', () => {
     await waitFor(() => {
       expect(onCreate).toHaveBeenCalledWith(
         expect.objectContaining({ icon: 'folder', color: 'blue' })
+      )
+    })
+  })
+
+  it('allows assigning a saved view to a Lab Home group in research lab mode', async () => {
+    const onCreate = vi.fn()
+    render(
+      <CreateViewDialog
+        {...defaultProps}
+        onCreate={onCreate}
+        researchLabModeEnabled
+        editingView={makeEditingView()}
+      />,
+    )
+
+    const trigger = screen.getByTestId('view-dialog-lab-home-group')
+    trigger.focus()
+    fireEvent.keyDown(trigger, { key: 'ArrowDown', code: 'ArrowDown' })
+    fireEvent.click(screen.getByRole('option', { name: 'Teaching' }))
+    fireEvent.submit(screen.getByText('Save').closest('form')!)
+
+    await waitFor(() => {
+      expect(onCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ labHomeGroup: 'teaching' }),
       )
     })
   })

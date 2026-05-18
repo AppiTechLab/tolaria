@@ -2,13 +2,23 @@ import { useState, useRef, useEffect } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FilterBuilder } from './FilterBuilder'
-import type { FilterGroup, ViewDefinition } from '../types'
+import type { FilterGroup, ResearchLabDomainKey, ViewDefinition } from '../types'
 import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
 
 type SaveViewResult = boolean | void
 type SaveViewHandler = (definition: ViewDefinition) => SaveViewResult | Promise<SaveViewResult>
-type InitialViewFormValues = Pick<ViewDefinition, 'name' | 'icon' | 'color' | 'filters'>
+type InitialViewFormValues = Pick<ViewDefinition, 'name' | 'icon' | 'color' | 'filters' | 'labHomeGroup'>
+
+const UNASSIGNED_LAB_HOME_GROUP = '__none__'
+
+const LAB_HOME_GROUP_LABEL_KEYS: Record<ResearchLabDomainKey, TranslationKey> = {
+  ongoingProjects: 'labHome.section.ongoingProjects.title',
+  projectAcquisition: 'labHome.section.projectAcquisition.title',
+  teaching: 'labHome.section.teaching.title',
+  labManagement: 'labHome.section.labManagement.title',
+}
 
 interface CreateViewDialogProps {
   open: boolean
@@ -16,6 +26,7 @@ interface CreateViewDialogProps {
   onCreate: SaveViewHandler
   availableFields: string[]
   locale?: AppLocale
+  researchLabModeEnabled?: boolean
   /** When provided, the dialog operates in edit mode with pre-populated fields. */
   editingView?: ViewDefinition | null
 }
@@ -26,8 +37,10 @@ interface CreateViewDialogFormProps {
   initialIcon: string
   initialColor: string | null
   initialFilters: FilterGroup
+  initialLabHomeGroup: ResearchLabDomainKey | null
   isEditing: boolean
   locale: AppLocale
+  showLabHomeGroupField: boolean
   onClose: () => void
   onCreate: SaveViewHandler
 }
@@ -38,13 +51,16 @@ function CreateViewDialogForm({
   initialIcon,
   initialColor,
   initialFilters,
+  initialLabHomeGroup,
   isEditing,
   locale,
+  showLabHomeGroupField,
   onClose,
   onCreate,
 }: CreateViewDialogFormProps) {
   const [name, setName] = useState(initialName)
   const [filters, setFilters] = useState<FilterGroup>(initialFilters)
+  const [labHomeGroup, setLabHomeGroup] = useState<ResearchLabDomainKey | null>(initialLabHomeGroup)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -64,6 +80,7 @@ function CreateViewDialogForm({
       icon: initialIcon || null,
       color: initialColor,
       sort: null,
+      ...(showLabHomeGroupField ? { labHomeGroup } : {}),
       filters,
     }
     setSaveError(null)
@@ -101,6 +118,30 @@ function CreateViewDialogForm({
           }}
         />
       </div>
+      {showLabHomeGroupField && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">{translate(locale, 'sidebar.nav.labHome')}</label>
+          <Select
+            value={labHomeGroup ?? UNASSIGNED_LAB_HOME_GROUP}
+            onValueChange={(value) => {
+              setLabHomeGroup(value === UNASSIGNED_LAB_HOME_GROUP ? null : value as ResearchLabDomainKey)
+              if (saveError) setSaveError(null)
+            }}
+          >
+            <SelectTrigger aria-label={translate(locale, 'sidebar.nav.labHome')} data-testid="view-dialog-lab-home-group" className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={UNASSIGNED_LAB_HOME_GROUP}>{translate(locale, 'inspector.properties.none')}</SelectItem>
+              {Object.entries(LAB_HOME_GROUP_LABEL_KEYS).map(([value, labelKey]) => (
+                <SelectItem key={value} value={value}>
+                  {translate(locale, labelKey)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {saveError && (
         <p role="alert" className="text-xs text-destructive">{saveError}</p>
       )}
@@ -132,6 +173,7 @@ function getInitialViewFormValues(
     name: editingView?.name ?? '',
     icon: editingView?.icon ?? '',
     color: editingView?.color ?? null,
+    labHomeGroup: editingView?.labHomeGroup ?? null,
     filters: editingView?.filters ?? { all: [{ field: availableFields[0] ?? 'type', op: 'equals', value: '' }] },
   }
 }
@@ -142,10 +184,20 @@ function getDialogDescription(isEditing: boolean): TranslationKey {
     : 'viewDialog.description.create'
 }
 
-export function CreateViewDialog({ open, onClose, onCreate, availableFields, locale = 'en', editingView }: CreateViewDialogProps) {
+export function CreateViewDialog({
+  open,
+  onClose,
+  onCreate,
+  availableFields,
+  locale = 'en',
+  researchLabModeEnabled = false,
+  editingView,
+}: CreateViewDialogProps) {
   const isEditing = !!editingView
   const initialValues = getInitialViewFormValues(editingView, availableFields)
-  const formKey = editingView ? `edit:${editingView.name}` : `create:${availableFields[0] ?? 'type'}`
+  const formKey = editingView
+    ? `edit:${editingView.name}:${editingView.labHomeGroup ?? 'none'}`
+    : `create:${availableFields[0] ?? 'type'}`
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) onClose() }}>
@@ -164,8 +216,10 @@ export function CreateViewDialog({ open, onClose, onCreate, availableFields, loc
             initialIcon={initialValues.icon ?? ''}
             initialColor={initialValues.color}
             initialFilters={initialValues.filters}
+            initialLabHomeGroup={initialValues.labHomeGroup ?? null}
             isEditing={isEditing}
             locale={locale}
+            showLabHomeGroupField={researchLabModeEnabled}
             onClose={onClose}
             onCreate={onCreate}
           />

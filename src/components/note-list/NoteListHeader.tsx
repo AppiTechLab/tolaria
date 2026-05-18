@@ -38,6 +38,7 @@ interface NoteListHeaderProps {
   sidebarCollapsed?: boolean
   searchVisible: boolean
   search: string
+  searchPlaceholder: string
   isSearching: boolean
   searchInputRef: React.RefObject<HTMLInputElement | null>
   propertyPicker?: ListPropertiesPopoverProps | null
@@ -226,23 +227,21 @@ function HeaderActions({
 function SearchRow({
   searchVisible,
   search,
+  searchPlaceholder,
   isSearching,
   searchInputRef,
-  locale,
   onSearchChange,
   onSearchKeyDown,
 }: Pick<
   NoteListHeaderProps,
   | 'searchVisible'
   | 'search'
+  | 'searchPlaceholder'
   | 'isSearching'
   | 'searchInputRef'
-  | 'locale'
   | 'onSearchChange'
   | 'onSearchKeyDown'
-> & {
-  locale: AppLocale
-}) {
+>) {
   if (!searchVisible) return null
 
   return (
@@ -250,7 +249,7 @@ function SearchRow({
       <div className="relative flex-1" aria-live="polite">
         <Input
           ref={searchInputRef}
-          placeholder={translate(locale, 'noteList.searchPlaceholder')}
+          placeholder={searchPlaceholder}
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={onSearchKeyDown}
@@ -280,6 +279,7 @@ export function NoteListHeader({
   sidebarCollapsed,
   searchVisible,
   search,
+  searchPlaceholder,
   isSearching,
   searchInputRef,
   propertyPicker,
@@ -331,9 +331,9 @@ export function NoteListHeader({
       <SearchRow
         searchVisible={searchVisible}
         search={search}
+        searchPlaceholder={searchPlaceholder}
         isSearching={isSearching}
         searchInputRef={searchInputRef}
-        locale={locale}
         onSearchChange={onSearchChange}
         onSearchKeyDown={onSearchKeyDown}
       />
