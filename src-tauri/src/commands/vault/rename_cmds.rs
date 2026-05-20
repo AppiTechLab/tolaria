@@ -355,7 +355,7 @@ mod tests {
         })
         .unwrap();
 
-        assert!(moved.new_path.ends_with("Projects/custom-name.md"));
+        assert!(Path::new(&moved.new_path).ends_with(Path::new("Projects").join("custom-name.md")));
         assert!(fs::read_to_string(moved.new_path)
             .unwrap()
             .contains("Draft Title"));

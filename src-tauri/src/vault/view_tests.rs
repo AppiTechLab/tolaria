@@ -61,15 +61,7 @@ filters:
 
     #[test]
     fn test_parse_lab_home_group() {
-        let yaml = r#"
-name: Active Projects
-labHomeGroup: ongoingProjects
-filters:
-    all:
-        - field: type
-            op: equals
-            value: Project
-"#;
+        let yaml = "name: Active Projects\nlabHomeGroup: ongoingProjects\nfilters:\n  all:\n    - field: type\n      op: equals\n      value: Project\n";
         let def: ViewDefinition = serde_yaml::from_str(yaml).unwrap();
         assert_eq!(def.lab_home_group.as_deref(), Some("ongoingProjects"));
     }

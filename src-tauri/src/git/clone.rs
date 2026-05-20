@@ -129,9 +129,23 @@ fn cleanup_failed_clone(dest: &Path) {
 mod tests {
     use super::*;
     use std::fs;
+    #[cfg(unix)]
     use std::os::unix::process::ExitStatusExt;
+    #[cfg(windows)]
+    use std::os::windows::process::ExitStatusExt;
     use std::path::Path;
     use std::process::Command as StdCommand;
+    use std::process::ExitStatus;
+
+    #[cfg(unix)]
+    fn exit_status(code: i32) -> ExitStatus {
+        ExitStatus::from_raw(code << 8)
+    }
+
+    #[cfg(windows)]
+    fn exit_status(code: i32) -> ExitStatus {
+        ExitStatus::from_raw(code as u32)
+    }
 
     fn init_source_repo(path: &Path) {
         fs::create_dir_all(path).unwrap();
@@ -203,7 +217,7 @@ mod tests {
     #[test]
     fn test_clone_failure_message_falls_back_to_stdout() {
         let output = Output {
-            status: std::process::ExitStatus::from_raw(128),
+            status: exit_status(128),
             stdout: b"fatal: stdout only".to_vec(),
             stderr: Vec::new(),
         };

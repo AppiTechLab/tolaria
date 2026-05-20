@@ -343,6 +343,7 @@ mod tests {
     use std::collections::HashMap;
     use std::ffi::OsString;
     use std::fs;
+    use std::path::Path;
     use tempfile::TempDir;
 
     fn assert_repo_path(url: &str, expected: Option<&str>) {
@@ -350,6 +351,15 @@ mod tests {
             parse_github_repo_path(url),
             expected.map(ToString::to_string)
         );
+    }
+
+    fn configure_repo_for_test(path: &Path) {
+        for args in [
+            ["config", "core.autocrlf", "false"],
+            ["config", "core.eol", "lf"],
+        ] {
+            git_command().args(args).current_dir(path).output().unwrap();
+        }
     }
 
     pub(crate) fn setup_git_repo() -> TempDir {
@@ -373,6 +383,8 @@ mod tests {
             .current_dir(path)
             .output()
             .unwrap();
+
+        configure_repo_for_test(path);
 
         dir
     }
@@ -404,6 +416,7 @@ mod tests {
                 .output()
                 .unwrap();
         }
+        configure_repo_for_test(clone_a_dir.path());
 
         let clone_b_dir = TempDir::new().unwrap();
         git_command()
@@ -421,6 +434,7 @@ mod tests {
                 .output()
                 .unwrap();
         }
+        configure_repo_for_test(clone_b_dir.path());
 
         (bare_dir, clone_a_dir, clone_b_dir)
     }
@@ -439,27 +453,34 @@ mod tests {
 
     #[test]
     fn test_git_launch_config_prefers_login_shell_git_and_path() {
+        let parent_path =
+            std::env::join_paths([PathBuf::from("/usr/bin"), PathBuf::from("/bin")]).unwrap();
+        let shell_path = std::env::join_paths([
+            PathBuf::from("/opt/homebrew/bin"),
+            PathBuf::from("/usr/bin"),
+            PathBuf::from("/bin"),
+        ])
+        .unwrap();
         let config = git_launch_config_from_parts(
-            Some(OsString::from("/usr/bin:/bin")),
+            Some(parent_path),
             Some(ShellGitConfig {
                 git_path: Some(PathBuf::from("/opt/homebrew/bin/git")),
-                path: Some(OsString::from("/opt/homebrew/bin:/usr/bin:/bin")),
+                path: Some(shell_path.clone()),
             }),
         );
 
         assert_eq!(config.program, OsString::from("/opt/homebrew/bin/git"));
-        assert_eq!(
-            config.path,
-            Some(OsString::from("/opt/homebrew/bin:/usr/bin:/bin"))
-        );
+        assert_eq!(config.path, Some(shell_path));
     }
 
     #[test]
     fn test_git_launch_config_keeps_default_git_when_shell_is_unavailable() {
-        let config = git_launch_config_from_parts(Some(OsString::from("/usr/bin:/bin")), None);
+        let parent_path =
+            std::env::join_paths([PathBuf::from("/usr/bin"), PathBuf::from("/bin")]).unwrap();
+        let config = git_launch_config_from_parts(Some(parent_path.clone()), None);
 
         assert_eq!(config.program, OsString::from("git"));
-        assert_eq!(config.path, Some(OsString::from("/usr/bin:/bin")));
+        assert_eq!(config.path, Some(parent_path));
     }
 
     #[test]

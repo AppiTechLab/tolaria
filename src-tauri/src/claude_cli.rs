@@ -677,6 +677,11 @@ mod tests {
         PathBuf::from(path.trim())
     }
 
+    #[cfg(windows)]
+    fn current_test_binary() -> PathBuf {
+        std::env::current_exe().unwrap()
+    }
+
     fn assert_binary_candidates_include(home: &Path, expected: &[PathBuf]) {
         let candidates = claude_binary_candidates_for_home(home);
         for candidate in expected {

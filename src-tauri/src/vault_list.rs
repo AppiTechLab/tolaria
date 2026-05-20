@@ -265,8 +265,8 @@ mod tests {
     #[test]
     fn loaded_vault_list_expands_tilde_paths() {
         let home = dirs::home_dir().unwrap();
-        let expected_vault = home.join("Workspace/refactoring-vault");
-        let expected_hidden = home.join("Workspace/tolaria/demo-vault-v2");
+        let expected_vault = home.join("Workspace").join("refactoring-vault");
+        let expected_hidden = home.join("Workspace").join("tolaria").join("demo-vault-v2");
         let list = VaultList {
             vaults: vec![VaultEntry {
                 label: "Refactoring".to_string(),

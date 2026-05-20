@@ -377,6 +377,19 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
+    fn configure_repo_for_test(path: &std::path::Path) {
+        for args in [
+            ["config", "core.autocrlf", "false"],
+            ["config", "core.eol", "lf"],
+        ] {
+            crate::git::git_command()
+                .args(args)
+                .current_dir(path)
+                .output()
+                .unwrap();
+        }
+    }
+
     fn vault_path(dir: &TempDir) -> String {
         dir.path().to_string_lossy().into_owned()
     }
@@ -390,6 +403,7 @@ mod tests {
         fs::write(dir.path().join("note.md"), "# Note\n").unwrap();
         let vault = vault_path(&dir);
         init_git_repo(vault.clone()).unwrap();
+        configure_repo_for_test(dir.path());
         (dir, vault)
     }
 

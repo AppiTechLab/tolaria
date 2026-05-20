@@ -286,12 +286,19 @@ mod tests {
 
         assert_eq!(
             normalized.vault_path,
-            format!("{}/Vaults/content", home.display()),
+            home.join("Vaults")
+                .join("content")
+                .to_string_lossy()
+                .into_owned(),
             "vault_path must be tilde-expanded so spawned agents can chdir into it",
         );
         assert_eq!(
             normalized.vault_paths,
-            vec![format!("{}/Vaults/secondary", home.display())],
+            vec![home
+                .join("Vaults")
+                .join("secondary")
+                .to_string_lossy()
+                .into_owned()],
             "vault_paths must be tilde-expanded so spawned agents can access every active vault",
         );
     }

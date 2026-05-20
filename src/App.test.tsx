@@ -1073,7 +1073,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Vault not found')).toBeInTheDocument()
-    })
+    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
     expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Choose a different folder')
   })
 
@@ -1090,7 +1090,7 @@ describe('App', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Welcome to Tolaria')).toBeInTheDocument()
-    })
+    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
     expect(screen.queryByText('Vault not found')).not.toBeInTheDocument()
     expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Open existing vault')
   })

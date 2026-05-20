@@ -192,7 +192,10 @@ fn fallback_node_paths() -> Vec<PathBuf> {
 
 fn node_binary_candidates_for_home(home: &Path) -> Vec<PathBuf> {
     let mut candidates = vec![
-        home.join(".local/share/mise/shims")
+        home.join(".local")
+            .join("share")
+            .join("mise")
+            .join("shims")
             .join(node_binary_name()),
         home.join(".mise").join("shims").join(node_binary_name()),
         home.join(".asdf").join("shims").join(node_binary_name()),
@@ -834,9 +837,13 @@ mod tests {
         let home = PathBuf::from("/Users/alex");
         let candidates = node_binary_candidates_for_home(&home);
         let expected = [
-            home.join(".local/share/mise/shims/node"),
-            home.join(".asdf/shims/node"),
-            home.join(".volta/bin/node"),
+            home.join(".local")
+                .join("share")
+                .join("mise")
+                .join("shims")
+                .join(node_binary_name()),
+            home.join(".asdf").join("shims").join(node_binary_name()),
+            home.join(".volta").join("bin").join(node_binary_name()),
         ];
 
         for candidate in expected {

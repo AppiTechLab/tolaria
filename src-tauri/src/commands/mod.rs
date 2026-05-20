@@ -29,11 +29,23 @@ pub fn expand_tilde(path: &str) -> Cow<'_, str> {
         return Cow::Borrowed(path);
     };
 
+    let expand_subpath = |rest: &str| {
+        let expanded = rest
+            .split(['/', '\\'])
+            .filter(|segment| !segment.is_empty())
+            .fold(home.clone(), |mut current, segment| {
+                current.push(segment);
+                current
+            });
+        Cow::Owned(expanded.to_string_lossy().into_owned())
+    };
+
     match path {
         "~" => Cow::Owned(home.to_string_lossy().into_owned()),
         _ => path
             .strip_prefix("~/")
-            .map(|rest| Cow::Owned(home.join(rest).to_string_lossy().into_owned()))
+            .or_else(|| path.strip_prefix("~\\"))
+            .map(expand_subpath)
             .unwrap_or(Cow::Borrowed(path)),
     }
 }
@@ -62,7 +74,13 @@ mod tests {
     fn expand_tilde_with_subpath() {
         let home = dirs::home_dir().unwrap();
         let result = expand_tilde("~/Documents/vault");
-        assert_eq!(result, format!("{}/Documents/vault", home.display()));
+        assert_eq!(
+            result,
+            home.join("Documents")
+                .join("vault")
+                .to_string_lossy()
+                .into_owned()
+        );
     }
 
     #[test]

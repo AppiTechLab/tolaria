@@ -637,13 +637,17 @@ mod tests {
             .iter()
             .find(|arg| arg.starts_with("mcp_servers.tolaria.command="))
             .expect("Codex should receive a transient Tolaria MCP command");
+        let resolved_node_path = command_override
+            .split_once('=')
+            .map(|(_, value)| value.trim_matches('"').replace("\\\\", "\\"))
+            .expect("Codex MCP command should be formatted as key=value");
 
         assert!(
             !command_override.ends_with(r#""node""#),
             "Codex MCP command should use Tolaria's resolved Node path, got {command_override}"
         );
         assert!(
-            command_override.contains('/'),
+            std::path::Path::new(&resolved_node_path).is_absolute(),
             "Codex MCP command should be an absolute Node path, got {command_override}"
         );
         assert!(args.iter().any(|arg| arg.contains(r#"WS_UI_PORT="9711""#)));

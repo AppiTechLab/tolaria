@@ -4,8 +4,16 @@ import { spawn } from 'node:child_process'
 
 const port = process.argv[2] ?? process.env.PORT ?? '41741'
 
-const child = spawn(
-  'pnpm',
+function spawnPnpm(args, options = {}) {
+  if (process.platform === 'win32') {
+    const comspec = process.env.ComSpec || 'cmd.exe'
+    return spawn(comspec, ['/d', '/s', '/c', ['pnpm', ...args].join(' ')], options)
+  }
+
+  return spawn('pnpm', args, options)
+}
+
+const child = spawnPnpm(
   ['dev', '--host', '127.0.0.1', '--port', port, '--strictPort'],
   {
     cwd: process.cwd(),

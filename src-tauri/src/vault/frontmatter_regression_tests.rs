@@ -84,8 +84,8 @@ fn test_filtered_properties_stay_hidden() {
             hidden_key: "Mentor",
         },
         HiddenPropertyCase {
-            content: "---\nTags:\n  - productivity\n  - writing\nCompany: Acme Corp\n---\n# Test\n",
-            hidden_key: "Tags",
+            content: "---\nMentors:\n  - \"[[person/alice]]\"\n  - \"[[person/bob]]\"\nCompany: Acme Corp\n---\n# Test\n",
+            hidden_key: "Mentors",
         },
     ];
 
@@ -95,7 +95,7 @@ fn test_filtered_properties_stay_hidden() {
 }
 
 #[test]
-fn test_single_element_array_properties_unwrap_to_scalars() {
+fn test_single_element_array_properties_remain_arrays() {
     let cases = [
         SingleElementArrayCase {
             note_type: "Responsibility",
@@ -110,7 +110,17 @@ fn test_single_element_array_properties_unwrap_to_scalars() {
     ];
 
     for case in cases {
-        assert_single_element_array_property(case);
+        let dir = TempDir::new().unwrap();
+        let content = format!(
+            "---\ntype: {}\n{}:\n  - {}\n---\n# Test\n",
+            case.note_type, case.key, case.value
+        );
+        let entry = parse_test_entry(&dir, "test.md", &content);
+        assert_eq!(
+            entry.properties.get(case.key),
+            Some(&serde_json::json!([case.value]))
+        );
+        assert_eq!(entry.is_a, Some(case.note_type.to_string()));
     }
 }
 

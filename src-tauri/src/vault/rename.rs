@@ -1269,7 +1269,7 @@ mod tests {
         })
         .expect("move should succeed");
 
-        assert!(result.new_path.ends_with("areas/weekly-review.md"));
+        assert!(Path::new(&result.new_path).ends_with(Path::new("areas").join("weekly-review.md")));
         assert!(!vault.join("projects/weekly-review.md").exists());
         assert!(vault.join("areas/weekly-review.md").exists());
         assert_eq!(

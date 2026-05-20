@@ -435,7 +435,7 @@ mod tests {
         assert_eq!(modified[0].relative_path, "note/brand-new.md");
         assert_eq!(modified[0].added_lines, Some(1));
         assert!(
-            modified[0].path.ends_with("/note/brand-new.md"),
+            Path::new(&modified[0].path).ends_with(Path::new("note").join("brand-new.md")),
             "Full path should end with relative path: {}",
             modified[0].path
         );
