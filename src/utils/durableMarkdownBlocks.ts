@@ -7,6 +7,7 @@ export interface InlineItem {
 }
 
 export interface BlockLike {
+  id?: string
   type?: string
   content?: InlineItem[]
   props?: Record<string, string>
@@ -66,6 +67,19 @@ interface SerializeDurableBlocksOptions {
   serializeOrdinaryBlocks: (blocks: unknown[]) => string
 }
 
+function createDurableBlockId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `tolaria-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function ensureBlockId<T extends BlockLike>(block: T): T {
+  if (typeof block.id === 'string' && block.id.trim().length > 0) return block
+  return { ...block, id: createDurableBlockId() }
+}
+
 export function lineEnding({ line }: MarkdownLine): string {
   if (line.endsWith('\r\n')) return '\r\n'
   return line.endsWith('\n') ? '\n' : ''
@@ -81,20 +95,41 @@ function splitMarkdownLines(markdown: string): string[] {
   return lines.filter((line, index) => line !== '' || index < lines.length - 1)
 }
 
-function encodePayload(payload: unknown): string {
-  return encodeURIComponent(JSON.stringify(payload))
+function encodeUtf8Hex(value: string): string {
+  return Array.from(new TextEncoder().encode(value), byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function decodeUtf8Hex(encoded: string): string {
+  if (encoded.length % 2 !== 0) throw new Error('Invalid hex payload length')
+
+  const bytes = new Uint8Array(encoded.length / 2)
+  for (let index = 0; index < encoded.length; index += 2) {
+    const byte = Number.parseInt(encoded.slice(index, index + 2), 16)
+    if (Number.isNaN(byte)) throw new Error('Invalid hex payload')
+    bytes[index / 2] = byte
+  }
+
+  return new TextDecoder().decode(bytes)
+}
+
+export function encodeDurablePayload(payload: unknown): string {
+  return encodeUtf8Hex(JSON.stringify(payload))
 }
 
 function decodePayload(codec: DurableBlockCodec, encoded: string): unknown | null {
   try {
-    return codec.decodePayload(JSON.parse(decodeURIComponent(encoded)))
+    return codec.decodePayload(JSON.parse(decodeUtf8Hex(encoded)))
   } catch {
-    return null
+    try {
+      return codec.decodePayload(JSON.parse(decodeURIComponent(encoded)))
+    } catch {
+      return null
+    }
   }
 }
 
 function durableToken(codec: DurableBlockCodec, payload: unknown): string {
-  return `${codec.tokenPrefix}${encodePayload(payload)}${codec.tokenSuffix}`
+  return `${codec.tokenPrefix}${encodeDurablePayload(payload)}${codec.tokenSuffix}`
 }
 
 function readDurableToken(codec: DurableBlockCodec, text: string): unknown | null {
@@ -210,15 +245,15 @@ function readCodeBlockPayload(block: BlockLike, codecs: readonly DurableBlockCod
 
 function injectDurableMarkdownBlock(block: BlockLike, codecs: readonly DurableBlockCodec[]): BlockLike {
   const tokenPayload = readTokenPayload(block, codecs)
-  if (tokenPayload) return tokenPayload.codec.buildBlock(block, tokenPayload.payload)
+  if (tokenPayload) return ensureBlockId(tokenPayload.codec.buildBlock(block, tokenPayload.payload))
 
   const codeBlockPayload = readCodeBlockPayload(block, codecs)
-  if (codeBlockPayload) return codeBlockPayload.codec.buildBlock(block, codeBlockPayload.payload)
+  if (codeBlockPayload) return ensureBlockId(codeBlockPayload.codec.buildBlock(block, codeBlockPayload.payload))
 
   const children = Array.isArray(block.children)
     ? block.children.map(child => injectDurableMarkdownBlock(child, codecs))
     : block.children
-  return { ...block, children }
+  return ensureBlockId({ ...block, children })
 }
 
 export function injectDurableMarkdownBlocks({

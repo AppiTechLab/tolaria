@@ -198,10 +198,10 @@ describe('normalizeParsedImageBlocks', () => {
   })
 })
 
-const blocksA = [{ type: 'paragraph', content: [{ type: 'text', text: 'A' }] }]
+const blocksA = [{ id: 'initial-paragraph', type: 'paragraph', content: [{ type: 'text', text: 'A' }], children: [] }]
 
 function makeTextParagraphBlock(text: string) {
-  return { type: 'paragraph', content: [{ type: 'text', text, styles: {} }], children: [] }
+  return { id: `paragraph-${text}`, type: 'paragraph', content: [{ type: 'text', text, styles: {} }], children: [] }
 }
 
 function makeTab(path: string, title: string) {
@@ -510,6 +510,30 @@ describe('useEditorTabSwap raw mode sync', () => {
         content: [{ type: 'text', text: 'Warmed body', styles: {} }],
       }),
     ])
+  })
+
+  it('falls back to setContent when the current editor document is missing block ids during a tab swap', async () => {
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+
+    const { mockEditor, rerenderWith } = await createSwapHarness({
+      initialProps: { tabs: [tabA], activeTabPath: 'a.md', rawMode: false },
+      setupEditor: (editor) => {
+        editor._docRef.current = [{
+          type: 'calloutBlock',
+          props: { calloutType: 'tip', title: 'Tip', body: 'See [[Next]]' },
+          children: [],
+        }]
+        editor.blocksToHTMLLossy.mockReturnValue('<p>safe fallback</p>')
+      },
+    })
+    mockEditor.replaceBlocks.mockClear()
+    mockEditor._tiptapEditor.commands.setContent.mockClear()
+
+    await rerenderWith({ tabs: [tabB], activeTabPath: 'b.md' })
+
+    expect(mockEditor.replaceBlocks).not.toHaveBeenCalled()
+    expect(mockEditor._tiptapEditor.commands.setContent).toHaveBeenCalledWith('<p>safe fallback</p>')
   })
 
   it('does not preparse prefetched note blocks in the background', async () => {

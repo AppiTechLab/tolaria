@@ -163,6 +163,20 @@ describe('main entrypoint', () => {
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack })
   })
 
+  it('suppresses recovered BlockNote position-out-of-range render errors from Sentry', async () => {
+    await importEntrypoint()
+
+    const error = new RangeError('Position 230 out of range')
+    const componentStack = '\n    in CalloutBlock\n    in BlockNoteRenderRecoveryBoundary'
+    window.__tolariaFrontendReady = true
+
+    rootOptions().onCaughtError?.(error, { componentStack })
+    expect(mocks.sentryHandler).not.toHaveBeenCalled()
+
+    rootOptions().onUncaughtError?.(error, { componentStack })
+    expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack })
+  })
+
   it('mounts a frontend readiness marker after the app shell', async () => {
     await importEntrypoint()
 

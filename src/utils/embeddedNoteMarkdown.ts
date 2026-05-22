@@ -1,6 +1,7 @@
 import {
   type BlockLike,
   type DurableBlockCodec,
+  encodeDurablePayload,
   injectDurableMarkdownBlocks,
 } from './durableMarkdownBlocks'
 
@@ -27,7 +28,7 @@ function decodeEmbeddedNotePayload(payload: unknown): EmbeddedNotePayload | null
 }
 
 function buildDurableToken(payload: EmbeddedNotePayload): string {
-  return `${TOKEN_PREFIX}${encodeURIComponent(JSON.stringify(payload))}${TOKEN_SUFFIX}`
+  return `${TOKEN_PREFIX}${encodeDurablePayload(payload)}${TOKEN_SUFFIX}`
 }
 
 function lineEnding(line: string): string {

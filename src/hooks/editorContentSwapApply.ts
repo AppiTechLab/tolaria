@@ -41,7 +41,11 @@ export function applyBlocksToEditor(options: ApplyBlocksToEditorOptions): boolea
   try {
     resetTextSelectionBeforeContentSwap(editor)
     const current = editor.document
-    if (current.length > 0 && safeBlocks.length > 0) {
+    const currentNeedsFallback = repairMalformedEditorBlocks(current) !== current
+    if (currentNeedsFallback) {
+      const markup = editor.blocksToHTMLLossy(safeBlocks)
+      editor._tiptapEditor.commands.setContent(markup)
+    } else if (current.length > 0 && safeBlocks.length > 0) {
       editor.replaceBlocks(current, safeBlocks)
     } else if (safeBlocks.length > 0) {
       editor.insertBlocks(safeBlocks, current[0], 'before')

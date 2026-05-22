@@ -567,3 +567,54 @@
   border-top: var(--horizontal-rule-thickness) solid var(--horizontal-rule-color);
   margin: var(--horizontal-rule-margin-vertical) 0;
 }
+
+/* --- Callout blocks --- */
+.editor__blocknote-container .bn-block-content[data-content-type="calloutBlock"] {
+  display: block;
+  width: 100%;
+}
+
+.callout-block {
+  --callout-color: #448aff;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  border-radius: 6px;
+  border-left: 4px solid var(--callout-color);
+  background-color: color-mix(in srgb, var(--callout-color) 10%, transparent);
+  padding: 8px 12px 8px 12px;
+  margin: 2px 0;
+  user-select: text;
+}
+
+.callout-block__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--callout-color);
+  line-height: 1.4;
+}
+
+.callout-block__icon {
+  flex-shrink: 0;
+}
+
+.callout-block__title {
+  font-size: 0.95em;
+}
+
+.callout-block__body {
+  margin-top: 4px;
+  color: var(--text-primary);
+  font-size: 0.95em;
+  line-height: 1.5;
+  white-space: normal;
+  font-weight: 400;
+}
+
+.callout-block__body .ai-markdown {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}

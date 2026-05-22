@@ -18,6 +18,17 @@ describe('blockNoteRenderRecovery', () => {
     expect(isRecoveredBlockNoteRenderError(new Error('Other render failure'), '')).toBe(false)
   })
 
+  it('treats BlockNote position-out-of-range crashes as recoverable', () => {
+    const error = new RangeError('Position 230 out of range')
+
+    expect(isRecoverableBlockNoteRenderError(error)).toBe(true)
+    expect(isRecoveredBlockNoteRenderError(error, '')).toBe(false)
+
+    markRecoveredBlockNoteRenderError(error)
+
+    expect(isRecoveredBlockNoteRenderError(error, '')).toBe(true)
+  })
+
   it('recognizes recovered BlockNote errors from the React component stack fallback', () => {
     expect(isRecoveredBlockNoteRenderError(
       new Error("Block doesn't have id"),

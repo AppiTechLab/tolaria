@@ -9,6 +9,7 @@ import {
   File,
   FlowArrow,
   ImageSquare,
+  Info,
   ListBullets,
   ListChecks,
   ListNumbers,
@@ -30,6 +31,7 @@ import {
   type Icon as PhosphorIcon,
 } from '@phosphor-icons/react'
 import { trackEvent } from '../lib/telemetry'
+import { CALLOUT_BLOCK_TYPE } from '../utils/calloutMarkdown'
 import { MATH_BLOCK_TYPE } from '../utils/mathMarkdown'
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
 import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdown'
@@ -99,6 +101,7 @@ const TOLARIA_BLOCK_TYPE_SELECT_ITEMS: TolariaBlockTypeSelectItem[] = [
 const TOLARIA_SLASH_MENU_ICONS: Partial<Record<string, PhosphorIcon>> = {
   audio: SpeakerHigh,
   bullet_list: ListBullets,
+  callout: Info,
   check_list: ListChecks,
   code_block: CodeBlock,
   divider: Minus,
@@ -128,6 +131,22 @@ function createBoardId(): string {
   }
 
   return `whiteboard-${Date.now().toString(36)}`
+}
+
+function createCalloutSlashMenuItem(
+  editor: Parameters<typeof getDefaultReactSlashMenuItems>[0],
+): TolariaSlashMenuItem {
+  return createBlockSlashMenuItem(editor, {
+    key: 'callout',
+    title: 'Callout',
+    aliases: ['note', 'warning', 'info', 'tip', 'alert', 'admonition', 'aside', 'callout'],
+    type: CALLOUT_BLOCK_TYPE,
+    props: {
+      calloutType: 'note',
+      title: 'Note',
+      body: '',
+    },
+  })
 }
 
 function createWhiteboardSlashMenuItem(
@@ -271,6 +290,7 @@ export function getTolariaSlashMenuItems(
   const items = addItemsToMediaGroup(
     getDefaultReactSlashMenuItems(editor) as TolariaSlashMenuItem[],
     [
+      createCalloutSlashMenuItem(editor),
       createMermaidSlashMenuItem(editor),
       createMathSlashMenuItem(editor, labels),
       createWhiteboardSlashMenuItem(editor),

@@ -458,7 +458,12 @@
 .ai-markdown ol {
   margin: 0.4em 0;
   padding-left: 1.5em;
+  list-style-position: outside;
 }
+.ai-markdown ul { list-style-type: disc; }
+.ai-markdown ol { list-style-type: decimal; }
+.ai-markdown ul ul { list-style-type: circle; }
+.ai-markdown ul ul ul { list-style-type: square; }
 .ai-markdown li { margin: 0.15em 0; }
 .ai-markdown li > ul,
 .ai-markdown li > ol { margin: 0.1em 0; }

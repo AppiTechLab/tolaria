@@ -1,4 +1,5 @@
 const BLOCKNOTE_MISSING_ID_ERROR = "Block doesn't have id"
+const BLOCKNOTE_POSITION_OUT_OF_RANGE_PATTERN = /Position \d+ out of range/u
 const BLOCKNOTE_RECOVERY_BOUNDARY_NAME = 'BlockNoteRenderRecoveryBoundary'
 const RECOVERED_BLOCKNOTE_RENDER_ERROR_MARK = '__tolariaRecoveredBlockNoteRenderError'
 
@@ -12,7 +13,10 @@ function hasRecoveredRenderErrorMark(error: unknown): boolean {
 }
 
 export function isRecoverableBlockNoteRenderError(error: unknown): boolean {
-  return error instanceof Error && error.message.includes(BLOCKNOTE_MISSING_ID_ERROR)
+  return error instanceof Error && (
+    error.message.includes(BLOCKNOTE_MISSING_ID_ERROR)
+    || BLOCKNOTE_POSITION_OUT_OF_RANGE_PATTERN.test(error.message)
+  )
 }
 
 export function markRecoveredBlockNoteRenderError(error: unknown): void {

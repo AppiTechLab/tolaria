@@ -5,9 +5,26 @@ import {
   defaultInlineContentSpecs,
 } from '@blocknote/core'
 import { createReactBlockSpec, createReactInlineContentSpec } from '@blocknote/react'
-import { lazy, Suspense } from 'react'
+import { type CSSProperties, type ElementType, lazy, Suspense, useContext } from 'react'
+import {
+  BookBookmark,
+  Bug,
+  Check,
+  CheckSquare,
+  ClipboardText,
+  Flame,
+  Info,
+  Lightning,
+  ListBullets,
+  PencilSimple,
+  Question,
+  Quotes,
+  Warning,
+  X,
+} from '@phosphor-icons/react'
 import { resolveWikilinkColor as resolveColor } from '../utils/wikilinkColors'
 import { resolveEntry } from '../utils/wikilink'
+import { CALLOUT_BLOCK_TYPE, resolveCalloutType } from '../utils/calloutMarkdown'
 import { EMBEDDED_NOTE_BLOCK_TYPE } from '../utils/embeddedNoteMarkdown'
 import { MATH_BLOCK_TYPE, MATH_INLINE_TYPE, renderMathToHtml } from '../utils/mathMarkdown'
 import { MERMAID_BLOCK_TYPE, mermaidFenceSource } from '../utils/mermaidMarkdown'
@@ -16,10 +33,12 @@ import { TLDRAW_BLOCK_TYPE, TLDRAW_DEFAULT_HEIGHT } from '../utils/tldrawMarkdow
 import type { VaultEntry } from '../types'
 import { createTolariaCodeBlockOptions } from './codeBlockOptions'
 import { EmbeddedNoteBlock } from './EmbeddedNoteBlock'
+import { MarkdownContent } from './MarkdownContent'
 import { NoteTitleIcon } from './NoteTitleIcon'
 import { MermaidDiagram } from './MermaidDiagram'
 import { SafeHtmlSpan } from './SafeMarkup'
 import { TasksQueryBlock } from './TasksQueryBlock'
+import { TasksBlockContext } from './tasksBlockContext'
 import { updateTldrawBlockPropsSafely } from './tldrawBlockProps'
 
 const TldrawWhiteboard = lazy(() => import('./TldrawWhiteboard').then(module => ({
@@ -277,6 +296,102 @@ const mermaidBlock = MermaidBlock()
 const tasksBlock = TasksBlock()
 const tldrawBlock = TldrawBlock()
 
+// Callout block: Obsidian-compatible callout blocks with type, title, and body.
+// Syntax: > [!type] Title\n> body
+const CALLOUT_ICON_MAP: Record<string, ElementType> = {
+  note:     PencilSimple,
+  abstract: ClipboardText,
+  info:     Info,
+  todo:     CheckSquare,
+  tip:      Flame,
+  success:  Check,
+  question: Question,
+  warning:  Warning,
+  failure:  X,
+  danger:   Lightning,
+  bug:      Bug,
+  example:  ListBullets,
+  quote:    Quotes,
+}
+
+const CALLOUT_COLOR_MAP: Record<string, string> = {
+  note:     '#448aff',
+  abstract: '#00b0ff',
+  info:     '#00b0ff',
+  todo:     '#00b0ff',
+  tip:      '#00bfa5',
+  success:  '#00c875',
+  question: '#64dd17',
+  warning:  '#ff8c00',
+  failure:  '#ff4444',
+  danger:   '#ff4444',
+  bug:      '#f50057',
+  example:  '#7c4dff',
+  quote:    '#9e9e9e',
+}
+
+function getCalloutColor(calloutType: string): string {
+  const canonical = resolveCalloutType(calloutType)
+  return CALLOUT_COLOR_MAP[canonical] ?? CALLOUT_COLOR_MAP.note ?? '#448aff'
+}
+
+function getCalloutIcon(calloutType: string): ElementType {
+  const canonical = resolveCalloutType(calloutType)
+  return CALLOUT_ICON_MAP[canonical] ?? BookBookmark
+}
+
+function CalloutBlockRenderer({ calloutType, title, body }: {
+  calloutType: string
+  title: string
+  body: string
+}) {
+  const { onNavigateWikilink } = useContext(TasksBlockContext)
+  const color = getCalloutColor(calloutType)
+  const Icon = getCalloutIcon(calloutType)
+  const displayTitle = title || calloutType.charAt(0).toUpperCase() + calloutType.slice(1)
+
+  return (
+    <div
+      className="callout-block"
+      data-callout={calloutType}
+      style={{ '--callout-color': color } as CSSProperties}
+    >
+      <div className="callout-block__header">
+        <Icon className="callout-block__icon" size={16} weight="fill" aria-hidden />
+        <span className="callout-block__title">{displayTitle}</span>
+      </div>
+      {body && (
+        <div className="callout-block__body">
+          <MarkdownContent content={body} onWikilinkClick={onNavigateWikilink} renderTaskBlocks />
+        </div>
+      )}
+    </div>
+  )
+}
+
+const CalloutBlock = createReactBlockSpec(
+  {
+    type: CALLOUT_BLOCK_TYPE,
+    propSchema: {
+      calloutType: { default: 'note' },
+      title: { default: '' },
+      body: { default: '' },
+    },
+    content: 'none',
+  },
+  {
+    render: (props) => (
+      <CalloutBlockRenderer
+        calloutType={props.block.props.calloutType}
+        title={props.block.props.title}
+        body={props.block.props.body}
+      />
+    ),
+  },
+)
+
+const calloutBlock = CalloutBlock()
+
 export const schema = BlockNoteSchema.create({
   inlineContentSpecs: {
     ...defaultInlineContentSpecs,
@@ -285,6 +400,7 @@ export const schema = BlockNoteSchema.create({
   },
 }).extend({
   blockSpecs: {
+    calloutBlock,
     mathBlock,
     embeddedNoteBlock,
     mermaidBlock,

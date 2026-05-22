@@ -1,9 +1,58 @@
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { VaultEntry } from '../types'
 import { MarkdownContent } from './MarkdownContent'
+import { TasksBlockContext } from './tasksBlockContext'
 import { preprocessWikilinks } from '../utils/chatWikilinks'
 
+const vaultLoaderCommandsMock = vi.hoisted(() => ({
+  tauriCall: vi.fn(),
+}))
+
+vi.mock('../hooks/vaultLoaderCommands', () => ({
+  tauriCall: vaultLoaderCommandsMock.tauriCall,
+}))
+
+function makeEntry(overrides: Partial<VaultEntry> = {}): VaultEntry {
+  return {
+    path: '/vault/project.md',
+    title: 'Project',
+    filename: 'project.md',
+    folder: 'project',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    modifiedAt: '2026-01-01T00:00:00.000Z',
+    tags: [],
+    aliases: [],
+    links: [],
+    backlinks: [],
+    relatedTo: [],
+    belongsTo: [],
+    backlinksCount: 0,
+    wordCount: 0,
+    frontmatter: {},
+    relationships: {},
+    isDirectory: false,
+    fileKind: 'markdown',
+    favorite: false,
+    organized: true,
+    ...overrides,
+  }
+}
+
+function dispatchMouseEvent(target: Node, type: 'click' | 'mousedown') {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+  })
+  target.dispatchEvent(event)
+  return event
+}
+
 describe('MarkdownContent', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('renders bold text', () => {
     render(<MarkdownContent content="Hello **world**" />)
     const strong = screen.getByText('world')
@@ -23,6 +72,40 @@ describe('MarkdownContent', () => {
     expect(pre!.textContent).toContain('const x = 1')
   })
 
+  it('keeps tasks fences as code blocks when task block rendering is disabled', () => {
+    const { container } = render(<MarkdownContent content={'```tasks\nnot done\n```'} />)
+    const pre = container.querySelector('pre')
+    expect(pre).toBeTruthy()
+    expect(pre!.textContent).toContain('not done')
+  })
+
+  it('renders fenced tasks blocks as live task query blocks when enabled', async () => {
+    vaultLoaderCommandsMock.tauriCall.mockResolvedValueOnce({
+      '/vault/project.md': '# Project\n\n- [ ] Follow up\n',
+    })
+
+    const { container } = render(
+      <TasksBlockContext.Provider
+        value={{
+          entries: [makeEntry()],
+          locale: 'en',
+          onNavigateWikilink: vi.fn(),
+          sourceEntry: undefined,
+          vaultPath: '/vault',
+        }}
+      >
+        <MarkdownContent content={'```tasks\nnot done\n```'} renderTaskBlocks />
+      </TasksBlockContext.Provider>,
+    )
+
+    expect(container.querySelector('pre')).toBeNull()
+    expect(await screen.findByText('Follow up')).toBeInTheDocument()
+    expect(vaultLoaderCommandsMock.tauriCall).toHaveBeenCalledWith(expect.objectContaining({
+      command: 'get_all_content',
+      tauriArgs: { vaultPath: '/vault' },
+    }))
+  })
+
   it('renders unordered lists', () => {
     const { container } = render(<MarkdownContent content={'- one\n- two\n- three'} />)
     const items = container.querySelectorAll('li')
@@ -32,6 +115,13 @@ describe('MarkdownContent', () => {
 
   it('renders ordered lists', () => {
     const { container } = render(<MarkdownContent content={'1. first\n2. second'} />)
+    const ol = container.querySelector('ol')
+    expect(ol).toBeTruthy()
+    expect(ol!.querySelectorAll('li')).toHaveLength(2)
+  })
+
+  it('renders ordered lists written with parenthesis markers', () => {
+    const { container } = render(<MarkdownContent content={'1) first\n2) second'} />)
     const ol = container.querySelector('ol')
     expect(ol).toBeTruthy()
     expect(ol!.querySelectorAll('li')).toHaveLength(2)
@@ -93,14 +183,42 @@ describe('MarkdownContent', () => {
       expect(wikilink!.getAttribute('data-wikilink-target')).toBe('My Note')
     })
 
-    it('fires onWikilinkClick when a wikilink is clicked', () => {
+    it('fires onWikilinkClick when a wikilink is clicked after the native click stack settles', async () => {
       const onClick = vi.fn()
       const { container } = render(
         <MarkdownContent content="See [[Daily Log]]" onWikilinkClick={onClick} />,
       )
       const wikilink = container.querySelector('.chat-wikilink')!
       fireEvent.click(wikilink)
+
+      expect(onClick).not.toHaveBeenCalled()
+
+      await Promise.resolve()
       expect(onClick).toHaveBeenCalledWith('Daily Log')
+    })
+
+    it('consumes wikilink mouse events before outer editor listeners can observe stale nodes', () => {
+      const onClick = vi.fn()
+      const outerClick = vi.fn()
+      const outerMouseDown = vi.fn()
+      const { container } = render(
+        <div data-testid="outer-host">
+          <MarkdownContent content="See [[Daily Log]]" onWikilinkClick={onClick} />
+        </div>,
+      )
+      const host = screen.getByTestId('outer-host')
+      host.addEventListener('click', outerClick)
+      host.addEventListener('mousedown', outerMouseDown)
+
+      const wikilink = container.querySelector('.chat-wikilink')!
+      const mouseDown = dispatchMouseEvent(wikilink, 'mousedown')
+      const click = dispatchMouseEvent(wikilink, 'click')
+
+      expect(mouseDown.defaultPrevented).toBe(true)
+      expect(click.defaultPrevented).toBe(true)
+      expect(outerMouseDown).not.toHaveBeenCalled()
+      expect(outerClick).not.toHaveBeenCalled()
+      expect(onClick).not.toHaveBeenCalled()
     })
 
     it('renders multiple wikilinks in the same paragraph', () => {
@@ -114,7 +232,7 @@ describe('MarkdownContent', () => {
       expect(wikilinks[1].textContent).toBe('Note B')
     })
 
-    it('handles pipe syntax [[target|display]]', () => {
+    it('handles pipe syntax [[target|display]]', async () => {
       const onClick = vi.fn()
       const { container } = render(
         <MarkdownContent content="See [[path/to/note|My Display]]" onWikilinkClick={onClick} />,
@@ -123,6 +241,8 @@ describe('MarkdownContent', () => {
       expect(wikilink.textContent).toBe('My Display')
       expect(wikilink.getAttribute('data-wikilink-target')).toBe('path/to/note')
       fireEvent.click(wikilink)
+
+      await Promise.resolve()
       expect(onClick).toHaveBeenCalledWith('path/to/note')
     })
 
@@ -142,7 +262,7 @@ describe('MarkdownContent', () => {
       expect(container.querySelector('.chat-wikilink')).toBeNull()
     })
 
-    it('handles notes with special characters in title', () => {
+    it('handles notes with special characters in title', async () => {
       const onClick = vi.fn()
       const { container } = render(
         <MarkdownContent content="Check [[Meeting — 2024/01/15]]" onWikilinkClick={onClick} />,
@@ -150,6 +270,8 @@ describe('MarkdownContent', () => {
       const wikilink = container.querySelector('.chat-wikilink')!
       expect(wikilink.textContent).toBe('Meeting — 2024/01/15')
       fireEvent.click(wikilink)
+
+      await Promise.resolve()
       expect(onClick).toHaveBeenCalledWith('Meeting — 2024/01/15')
     })
 

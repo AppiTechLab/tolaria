@@ -5,6 +5,7 @@ import {
   serializeDurableMarkdownBlocks,
   type MarkdownSerializer,
 } from './durableMarkdownBlocks'
+import { calloutMarkdownCodec, preProcessCalloutMarkdown } from './calloutMarkdown'
 import { embeddedNoteMarkdownCodec, preProcessEmbeddedNoteMarkdown } from './embeddedNoteMarkdown'
 import { serializeMathAwareBlocks } from './mathMarkdown'
 import { mermaidMarkdownCodec } from './mermaidMarkdown'
@@ -12,6 +13,7 @@ import { tasksMarkdownCodec } from './tasksMarkdown'
 import { tldrawMarkdownCodec } from './tldrawMarkdown'
 
 const EDITOR_DURABLE_MARKDOWN_CODECS = [
+  calloutMarkdownCodec,
   embeddedNoteMarkdownCodec,
   mermaidMarkdownCodec,
   tasksMarkdownCodec,
@@ -19,7 +21,8 @@ const EDITOR_DURABLE_MARKDOWN_CODECS = [
 ] as const
 
 export function preProcessDurableEditorMarkdown({ markdown }: { markdown: string }): string {
-  const withEmbeddedNotes = preProcessEmbeddedNoteMarkdown({ markdown })
+  const withCallouts = preProcessCalloutMarkdown({ markdown })
+  const withEmbeddedNotes = preProcessEmbeddedNoteMarkdown({ markdown: withCallouts })
   return preProcessDurableMarkdownBlocks({
     markdown: withEmbeddedNotes,
     codecs: EDITOR_DURABLE_MARKDOWN_CODECS,

@@ -137,7 +137,7 @@ export function EmbeddedNoteBlock({ source, target }: EmbeddedNoteBlockProps) {
 
       {!isLoading && !isUnavailable && displayedBodyMarkdown && (
         <div className="px-3 py-3">
-          <MarkdownContent content={displayedBodyMarkdown} onWikilinkClick={onNavigateWikilink} />
+          <MarkdownContent content={displayedBodyMarkdown} onWikilinkClick={onNavigateWikilink} renderTaskBlocks />
         </div>
       )}
 

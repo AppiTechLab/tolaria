@@ -1,9 +1,10 @@
-import { memo, useMemo, useCallback, type MouseEvent } from 'react'
-import Markdown, { defaultUrlTransform } from 'react-markdown'
+import { Children, isValidElement, memo, useMemo, useCallback, type MouseEvent, type ReactNode } from 'react'
+import Markdown, { defaultUrlTransform, type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { preprocessWikilinks, WIKILINK_SCHEME } from '../utils/chatWikilinks'
 import { supportsModernRegexFeatures } from '../utils/regexCapabilities'
+import { TasksQueryBlock } from './TasksQueryBlock'
 
 const REMARK_PLUGINS = [remarkGfm]
 const REHYPE_PLUGINS = supportsModernRegexFeatures() ? [rehypeHighlight] : []
@@ -16,26 +17,79 @@ function wikilinkUrlTransform(url: string): string {
 interface MarkdownContentProps {
   content: string
   onWikilinkClick?: (target: string) => void
+  renderTaskBlocks?: boolean
 }
 
-export const MarkdownContent = memo(function MarkdownContent({ content, onWikilinkClick }: MarkdownContentProps) {
+function readCodeLanguage(className: unknown): string | null {
+  if (typeof className !== 'string') return null
+
+  const token = className
+    .split(/\s+/u)
+    .find(candidate => candidate.startsWith('language-'))
+
+  return token ? token.slice('language-'.length).toLowerCase() : null
+}
+
+function readReactText(node: ReactNode): string {
+  if (typeof node === 'string' || typeof node === 'number') return String(node)
+  if (Array.isArray(node)) return node.map(readReactText).join('')
+  if (isValidElement<{ children?: ReactNode }>(node)) return readReactText(node.props.children)
+  return ''
+}
+
+function normalizeFenceBody(text: string): string {
+  return text.endsWith('\n') ? text : `${text}\n`
+}
+
+function readTasksQuery(children: ReactNode): string | null {
+  const [onlyChild] = Children.toArray(children)
+  if (!isValidElement<{ children?: ReactNode; className?: string }>(onlyChild)) return null
+  if (readCodeLanguage(onlyChild.props.className) !== 'tasks') return null
+
+  return normalizeFenceBody(readReactText(onlyChild.props.children))
+}
+
+function resolveWikilinkTarget(target: EventTarget | null): string | null {
+  if (!(target instanceof HTMLElement)) return null
+  return target.closest<HTMLElement>('[data-wikilink-target]')?.dataset.wikilinkTarget ?? null
+}
+
+function consumeLinkEvent(event: Pick<MouseEvent, 'preventDefault' | 'stopPropagation'>) {
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function scheduleAfterNativeClick(callback: () => void) {
+  if (typeof queueMicrotask === 'function') queueMicrotask(callback)
+  else window.setTimeout(callback, 0)
+}
+
+export const MarkdownContent = memo(function MarkdownContent({ content, onWikilinkClick, renderTaskBlocks = false }: MarkdownContentProps) {
   const processedContent = useMemo(
     () => onWikilinkClick ? preprocessWikilinks(content) : content,
     [content, onWikilinkClick],
   )
 
-  const handleClick = useCallback((e: MouseEvent) => {
-    const el = (e.target as HTMLElement).closest<HTMLElement>('[data-wikilink-target]')
-    if (el) {
-      e.preventDefault()
-      onWikilinkClick?.(el.dataset.wikilinkTarget!)
-    }
+  const handleMouseDownCapture = useCallback((event: MouseEvent) => {
+    if (!resolveWikilinkTarget(event.target)) return
+    consumeLinkEvent(event)
+  }, [])
+
+  const handleClickCapture = useCallback((event: MouseEvent) => {
+    const target = resolveWikilinkTarget(event.target)
+    if (!target) return
+
+    consumeLinkEvent(event)
+    scheduleAfterNativeClick(() => onWikilinkClick?.(target))
   }, [onWikilinkClick])
 
-  const components = useMemo(() => {
-    if (!onWikilinkClick) return undefined
-    return {
-      a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+  const components = useMemo<Components | undefined>(() => {
+    if (!onWikilinkClick && !renderTaskBlocks) return undefined
+
+    const nextComponents: Components = {}
+
+    if (onWikilinkClick) {
+      nextComponents.a = ({ href, children }: { href?: string; children?: ReactNode }) => {
         if (href?.startsWith(WIKILINK_SCHEME)) {
           const target = decodeURIComponent(href.slice(WIKILINK_SCHEME.length))
           return (
@@ -45,12 +99,27 @@ export const MarkdownContent = memo(function MarkdownContent({ content, onWikili
           )
         }
         return <a href={href}>{children}</a>
-      },
+      }
     }
-  }, [onWikilinkClick])
+
+    if (renderTaskBlocks) {
+      nextComponents.pre = ({ children, ...props }) => {
+        const query = readTasksQuery(children)
+        if (query !== null) return <TasksQueryBlock query={query} />
+        return <pre {...props}>{children}</pre>
+      }
+    }
+
+    return nextComponents
+  }, [onWikilinkClick, renderTaskBlocks])
 
   return (
-    <div className="ai-markdown" onClick={onWikilinkClick ? handleClick : undefined} role="presentation">
+    <div
+      className="ai-markdown"
+      onMouseDownCapture={onWikilinkClick ? handleMouseDownCapture : undefined}
+      onClickCapture={onWikilinkClick ? handleClickCapture : undefined}
+      role="presentation"
+    >
       <Markdown
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}
