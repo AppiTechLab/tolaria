@@ -357,6 +357,7 @@ function CalloutBlockRenderer({ calloutType, title, body }: {
       style={{ '--callout-color': color } as CSSProperties}
     >
       <div className="callout-block__header">
+        {/* eslint-disable-next-line react-hooks/static-components -- icon from static map lookup */}
         <Icon className="callout-block__icon" size={16} weight="fill" aria-hidden />
         <span className="callout-block__title">{displayTitle}</span>
       </div>

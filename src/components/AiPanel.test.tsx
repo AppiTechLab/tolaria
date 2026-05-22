@@ -392,7 +392,7 @@ describe('AiPanel', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
-  it('clicking a wikilink in AI response calls onOpenNote with the target', () => {
+  it('clicking a wikilink in AI response calls onOpenNote with the target', async () => {
     mockMessages = [{
       userMessage: 'Tell me about notes',
       actions: [],
@@ -407,10 +407,12 @@ describe('AiPanel', () => {
     expect(wikilink).toBeTruthy()
     expect(wikilink!.textContent).toBe('Build Laputa App')
     fireEvent.click(wikilink!)
+
+    await Promise.resolve()
     expect(onOpenNote).toHaveBeenCalledWith('Build Laputa App')
   })
 
-  it('renders wikilinks with special characters and clicking works', () => {
+  it('renders wikilinks with special characters and clicking works', async () => {
     mockMessages = [{
       userMessage: 'Tell me about meetings',
       actions: [],
@@ -424,8 +426,13 @@ describe('AiPanel', () => {
     const wikilinks = container.querySelectorAll('.chat-wikilink')
     expect(wikilinks).toHaveLength(2)
     fireEvent.click(wikilinks[0])
+
+    await Promise.resolve()
     expect(onOpenNote).toHaveBeenCalledWith('Meeting — 2024/01/15')
+
     fireEvent.click(wikilinks[1])
+
+    await Promise.resolve()
     expect(onOpenNote).toHaveBeenCalledWith('Pasta Carbonara')
   })
 

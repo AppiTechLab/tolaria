@@ -74,7 +74,10 @@ describe('EmbeddedNoteBlock', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Embedded Note' }))
     expect(onNavigateWikilink).toHaveBeenCalledWith('embedded-note')
 
+    onNavigateWikilink.mockClear()
     fireEvent.click(screen.getByText('Linked Note'))
+
+    await Promise.resolve()
     expect(onNavigateWikilink).toHaveBeenCalledWith('Linked Note')
   })
 

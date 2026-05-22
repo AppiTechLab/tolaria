@@ -3,7 +3,12 @@ import { act, renderHook } from '@testing-library/react'
 import { useEditorTabSwap } from './useEditorTabSwap'
 import type { VaultEntry } from '../types'
 
-const initialBlocks = [{ type: 'paragraph', content: [{ type: 'text', text: 'A' }] }]
+const initialBlocks = [{
+  id: 'initial-paragraph',
+  type: 'paragraph',
+  content: [{ type: 'text', text: 'A', styles: {} }],
+  children: [],
+}]
 
 function makeTab(path: string, title: string) {
   return {
@@ -18,8 +23,17 @@ function makeMockEditor(docRef: { current: unknown[] }) {
     get prosemirrorView() { return {} },
     onMount: (cb: () => void) => { cb(); return () => {} },
     replaceBlocks: vi.fn((_old, newBlocks) => { docRef.current = newBlocks }),
+    insertBlocks: vi.fn(),
     blocksToMarkdownLossy: vi.fn(() => ''),
+    blocksToHTMLLossy: vi.fn(() => ''),
     tryParseMarkdownToBlocks: vi.fn(() => initialBlocks),
+    _tiptapEditor: {
+      state: { doc: { content: { size: 8 } } },
+      commands: {
+        setContent: vi.fn(),
+        setTextSelection: vi.fn(),
+      },
+    },
   }
   return editor
 }
@@ -62,6 +76,7 @@ describe('useEditorTabSwap rich-editor serialization performance', () => {
     await flushEditorTick()
 
     docRef.current = [{
+      id: 'changed-paragraph',
       type: 'paragraph',
       content: [{ type: 'text', text: 'Changed body', styles: {} }],
       children: [],

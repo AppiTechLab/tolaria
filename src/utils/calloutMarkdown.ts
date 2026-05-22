@@ -49,7 +49,7 @@ export function resolveCalloutType(rawType: string): string {
 // > [!type] Title text
 // > [!type]+ Title text   (foldable, open by default)
 // > [!type]- Title text   (foldable, closed by default)
-const CALLOUT_FIRST_LINE = /^> \[!([a-zA-Z][a-zA-Z0-9-]*)\][+\-]?[ \t]*(.*)$/
+const CALLOUT_FIRST_LINE = /^> \[!([a-zA-Z][a-zA-Z0-9-]*)\][+-]?[ \t]*(.*)$/
 
 function splitMarkdownLines(markdown: string): string[] {
   const lines = markdown.match(/[^\n]*(?:\n|$)/g) ?? []
