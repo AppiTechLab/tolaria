@@ -307,6 +307,28 @@
   margin: 0;
 }
 
+.raw-editor-codemirror .cm-inline-tag {
+  border-radius: 6px;
+  padding: 0 0.28em;
+  margin: 0 0.03em;
+  background: var(--inline-tag-bg, var(--accent-blue-light));
+  color: var(--inline-tag-color, var(--accent-blue));
+  font-weight: 600;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.editor__blocknote-container .bn-inline-tag {
+  border-radius: 6px;
+  padding: 0 0.28em;
+  margin: 0 0.03em;
+  background: var(--inline-tag-bg, var(--accent-blue-light));
+  color: var(--inline-tag-color, var(--accent-blue));
+  font-weight: 600;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
 /* --- Note Icon Area --- */
 .note-icon-area {
   display: flex;

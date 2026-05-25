@@ -1,3 +1,5 @@
+import { findInlineMarkdownTagMatches } from './inlineTags'
+
 // Wikilink placeholder tokens for markdown round-trip
 const WL_START = '\u2039WIKILINK:'
 const WL_END = '\u203A'
@@ -13,7 +15,6 @@ type TableLineMap = boolean[]
 type PlaceholderPayload = string
 type WikilinkTarget = string
 type InlineTag = string
-const INLINE_TAG_RE = /(^|[^A-Za-z0-9_/])#([A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?(?:\/[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?)*)/g
 type FrontmatterSplit = [MarkdownSource, MarkdownSource]
 type CharacterCount = number
 type LineIndex = number
@@ -313,44 +314,14 @@ export function extractOutgoingLinks(content: MarkdownSource): WikilinkTarget[] 
   return [...new Set(links)].sort()
 }
 
-function isMarkdownFence(line: MarkdownLine): boolean {
-  return /^\s*(```|~~~)/.test(line)
-}
-
-function isMarkdownHeading(line: MarkdownLine): boolean {
-  return /^\s{0,3}#{1,6}\s/.test(line)
-}
-
-function stripInlineCode(line: MarkdownLine): MarkdownLine {
-  return line.replace(/`[^`\n]*`/g, ' ')
-}
-
-function collectInlineTagsFromLine(line: MarkdownLine, tags: InlineTag[], seen: Set<InlineTag>): void {
-  const searchable = stripInlineCode(line)
-  INLINE_TAG_RE.lastIndex = 0
-  let match: RegExpExecArray | null
-
-  while ((match = INLINE_TAG_RE.exec(searchable)) !== null) {
-    const tag = match[2]
-    if (seen.has(tag)) continue
-    seen.add(tag)
-    tags.push(tag)
-  }
-}
-
 export function extractInlineTags(content: MarkdownSource): InlineTag[] {
-  const [, body] = splitFrontmatter(content)
   const tags: InlineTag[] = []
   const seen = new Set<InlineTag>()
-  let inFence = false
 
-  for (const line of body.split(/\r?\n/)) {
-    if (isMarkdownFence(line)) {
-      inFence = !inFence
-      continue
-    }
-    if (inFence || isMarkdownHeading(line)) continue
-    collectInlineTagsFromLine(line, tags, seen)
+  for (const match of findInlineMarkdownTagMatches(content)) {
+    if (seen.has(match.tag)) continue
+    seen.add(match.tag)
+    tags.push(match.tag)
   }
 
   return tags

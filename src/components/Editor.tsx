@@ -33,7 +33,9 @@ import {
 import { useRegisterEditorContentFlushes } from './editorContentFlushRegistration'
 import { useRawModeWithFlush } from './useRawModeWithFlush'
 import { createArrowLigaturesExtension } from './arrowLigaturesExtension'
+import { createHashtagSlashMenuGuardExtension } from './hashtagSlashMenuGuardExtension'
 import { createImeCompositionKeyGuardExtension } from './imeCompositionKeyGuardExtension'
+import { createInlineTagHighlightExtension } from './inlineTagHighlightExtension'
 import { createMathInputExtension } from './mathInputExtension'
 import { createRichEditorTransformErrorRecoveryExtension } from './richEditorTransformErrorRecoveryExtension'
 import { useFilenameAutolinkGuard } from './useFilenameAutolinkGuard'
@@ -292,6 +294,8 @@ function useEditorSetup({
     extensions: [
       createRichEditorTransformErrorRecoveryExtension(),
       createImeCompositionKeyGuardExtension(),
+      createHashtagSlashMenuGuardExtension(),
+      createInlineTagHighlightExtension(),
       createArrowLigaturesExtension(),
       createMathInputExtension(),
     ],

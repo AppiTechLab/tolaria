@@ -1,16 +1,18 @@
-import { Children, isValidElement, memo, useMemo, useCallback, type MouseEvent, type ReactNode } from 'react'
+import { Children, isValidElement, memo, useMemo, useCallback, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import Markdown, { defaultUrlTransform, type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import { preprocessWikilinks, WIKILINK_SCHEME } from '../utils/chatWikilinks'
 import { supportsModernRegexFeatures } from '../utils/regexCapabilities'
+import { getTagStyle } from '../utils/tagStyles'
+import { INLINE_TAG_SCHEME, preprocessInlineTags } from '../utils/inlineTags'
 import { TasksQueryBlock } from './TasksQueryBlock'
 
 const REMARK_PLUGINS = [remarkGfm]
 const REHYPE_PLUGINS = supportsModernRegexFeatures() ? [rehypeHighlight] : []
 
-function wikilinkUrlTransform(url: string): string {
-  if (url.startsWith(WIKILINK_SCHEME)) return url
+function markdownUrlTransform(url: string): string {
+  if (url.startsWith(WIKILINK_SCHEME) || url.startsWith(INLINE_TAG_SCHEME)) return url
   return defaultUrlTransform(url)
 }
 
@@ -66,7 +68,7 @@ function scheduleAfterNativeClick(callback: () => void) {
 
 export const MarkdownContent = memo(function MarkdownContent({ content, onWikilinkClick, renderTaskBlocks = false }: MarkdownContentProps) {
   const processedContent = useMemo(
-    () => onWikilinkClick ? preprocessWikilinks(content) : content,
+    () => preprocessInlineTags(onWikilinkClick ? preprocessWikilinks(content) : content),
     [content, onWikilinkClick],
   )
 
@@ -83,23 +85,39 @@ export const MarkdownContent = memo(function MarkdownContent({ content, onWikili
     scheduleAfterNativeClick(() => onWikilinkClick?.(target))
   }, [onWikilinkClick])
 
-  const components = useMemo<Components | undefined>(() => {
-    if (!onWikilinkClick && !renderTaskBlocks) return undefined
-
+  const components = useMemo<Components>(() => {
     const nextComponents: Components = {}
 
-    if (onWikilinkClick) {
-      nextComponents.a = ({ href, children }: { href?: string; children?: ReactNode }) => {
-        if (href?.startsWith(WIKILINK_SCHEME)) {
-          const target = decodeURIComponent(href.slice(WIKILINK_SCHEME.length))
+    nextComponents.a = ({ href, children }: { href?: string; children?: ReactNode }) => {
+      if (href?.startsWith(INLINE_TAG_SCHEME)) {
+        const tag = decodeURIComponent(href.slice(INLINE_TAG_SCHEME.length))
+        const style = getTagStyle(tag)
+        return (
+          <span
+            className="inline-tag-highlight"
+            data-inline-tag={tag}
+            style={{
+              '--inline-tag-bg': style.bg,
+              '--inline-tag-color': style.color,
+            } as CSSProperties}
+          >
+            {children}
+          </span>
+        )
+      }
+
+      if (href?.startsWith(WIKILINK_SCHEME)) {
+        const target = decodeURIComponent(href.slice(WIKILINK_SCHEME.length))
+        if (onWikilinkClick) {
           return (
             <span className="chat-wikilink" data-wikilink-target={target} role="link" tabIndex={0}>
               {children}
             </span>
           )
         }
-        return <a href={href}>{children}</a>
       }
+
+      return <a href={href}>{children}</a>
     }
 
     if (renderTaskBlocks) {
@@ -124,7 +142,7 @@ export const MarkdownContent = memo(function MarkdownContent({ content, onWikili
         remarkPlugins={REMARK_PLUGINS}
         rehypePlugins={REHYPE_PLUGINS}
         components={components}
-        urlTransform={onWikilinkClick ? wikilinkUrlTransform : undefined}
+        urlTransform={markdownUrlTransform}
       >
         {processedContent}
       </Markdown>

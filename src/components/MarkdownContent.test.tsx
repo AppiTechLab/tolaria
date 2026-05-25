@@ -164,6 +164,25 @@ describe('MarkdownContent', () => {
     expect(bq!.textContent).toContain('A quote')
   })
 
+  it('highlights inline tags in markdown text', () => {
+    const { container } = render(
+      <MarkdownContent content="Text before #project/ipc4mh and #meeting-notes after." />,
+    )
+
+    const tags = container.querySelectorAll('.inline-tag-highlight')
+    expect(tags).toHaveLength(2)
+    expect(tags[0].textContent).toBe('#project/ipc4mh')
+    expect(tags[1].textContent).toBe('#meeting-notes')
+  })
+
+  it('does not highlight headings, inline code, fenced code, urls, colors, or issue numbers', () => {
+    const { container } = render(
+      <MarkdownContent content={'# Heading\n\nUse `#not-a-tag` here.\n\n```js\nconst tag = "#not-a-tag"\n```\n\nVisit https://example.com/page#section and skip issue #123 plus #fff.'} />,
+    )
+
+    expect(container.querySelectorAll('.inline-tag-highlight')).toHaveLength(0)
+  })
+
   describe('wikilinks', () => {
     it('preprocessWikilinks converts [[Target]] to markdown links', () => {
       expect(preprocessWikilinks('See [[My Note]]')).toBe('See [My Note](wikilink://My%20Note)')

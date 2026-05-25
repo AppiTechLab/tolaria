@@ -446,6 +446,17 @@
 .ai-markdown h3,
 .ai-markdown h4 {
   font-weight: 600;
+
+.ai-markdown .inline-tag-highlight {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 0 0.35em;
+  margin: 0 0.05em;
+  background: var(--inline-tag-bg, var(--accent-blue-light));
+  color: var(--inline-tag-color, var(--accent-blue));
+  font-weight: 600;
+  line-height: 1.4;
+}
   margin: 0.8em 0 0.4em;
   line-height: 1.3;
 }

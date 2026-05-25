@@ -511,6 +511,11 @@ describe('extractInlineTags', () => {
     const content = '# Heading\n\nUse `#not/code` inline.\n\n```md\n#not/in-fence\n```\n\nVisit https://example.com/#fragment and keep #yes/ok.'
     expect(extractInlineTags(content)).toEqual(['yes/ok'])
   })
+
+  it('ignores numeric issue markers and hex colors', () => {
+    const content = 'Issue #123 is open, #fff is a color, and #research/ai is a tag.'
+    expect(extractInlineTags(content)).toEqual(['research/ai'])
+  })
 })
 
 describe('extractBacklinkContext', () => {

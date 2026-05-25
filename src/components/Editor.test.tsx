@@ -403,6 +403,20 @@ describe('Editor', () => {
     })
   })
 
+  it('registers the hashtag slash guard extension with BlockNote', () => {
+    renderEditor({
+      tabs: [mockTab],
+      activeTabPath: mockEntry.path,
+    })
+
+    const extensions = (blockNoteCreation.options.at(-1) as {
+      extensions?: Array<(options: { editor: typeof mockEditor }) => { key?: string }>
+    } | undefined)?.extensions ?? []
+    const extensionKeys = extensions.map(extension => extension({ editor: mockEditor }).key)
+
+    expect(extensionKeys).toContain('hashtagSlashMenuGuard')
+  })
+
   it('registers a rich-editor flush hook for pending BlockNote changes', async () => {
     const onContentChange = vi.fn()
     const flushPendingEditorContentRef = { current: null as ((path: string) => void) | null }
@@ -1300,5 +1314,34 @@ describe('hashtag autocomplete', () => {
     expect(items).toHaveLength(1)
     items[0].onItemClick()
     expect(mockEditor.insertInlineContent).toHaveBeenCalledWith('#focus ', { updateSelection: true })
+  })
+
+  it('matches slash-delimited nested tag queries', async () => {
+    mockFilterSuggestionItems.mockClear()
+    mockFilterSuggestionItems.mockImplementation((items: unknown[]) => items)
+    render(
+      <Editor
+        {...defaultProps}
+        tabs={[mockTab]}
+        activeTabPath={mockEntry.path}
+        entries={[
+          {
+            ...mockEntry,
+            title: 'Nested Tag Note',
+            filename: 'nested-tag-note.md',
+            path: '/vault/nested-tag-note.md',
+            properties: {
+              Tags: ['project/ipc4mh/task'],
+            },
+          },
+        ]}
+      />,
+    )
+
+    const getItems = capturedGetItemsByTrigger['#']
+    const items = await getItems('ipc4mh/ta')
+
+    expect(items).toHaveLength(1)
+    expect(items[0].title).toBe('#project/ipc4mh/task')
   })
 })

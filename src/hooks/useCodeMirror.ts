@@ -12,6 +12,7 @@ import {
 import { EditorState, Prec } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { frontmatterHighlightPlugin, frontmatterHighlightTheme } from '../extensions/frontmatterHighlight'
+import { inlineTagHighlightPlugin } from '../extensions/inlineTagHighlight'
 import { markdownLanguage } from '../extensions/markdownHighlight'
 import { RUNTIME_STYLE_NONCE } from '../lib/runtimeStyleNonce'
 import { resolveArrowLigatureInput } from '../utils/arrowLigatures'
@@ -251,6 +252,7 @@ export function useCodeMirror(
         markdownLanguage(),
         frontmatterHighlightTheme(),
         frontmatterHighlightPlugin,
+        inlineTagHighlightPlugin,
         zoomCursorFix(),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !externalSyncRef.current) {
