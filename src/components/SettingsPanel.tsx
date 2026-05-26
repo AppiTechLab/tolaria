@@ -340,7 +340,7 @@ export function SettingsPanel({
       onRemoveVault={onRemoveVault}
       onSetDefaultWorkspace={onSetDefaultWorkspace}
       onUpdateWorkspaceIdentity={onUpdateWorkspaceIdentity}
-      researchLabMode={researchLabMode}
+      researchLabMode={normalizeResearchLabModeConfig(researchLabMode)}
       vaultFolders={vaultFolders}
       onSaveResearchLabMode={onSaveResearchLabMode}
       isGitVault={isGitVault}
@@ -355,7 +355,9 @@ type SettingsPanelInnerProps = Omit<SettingsPanelProps, 'open' | 'explicitOrgani
   aiAgentsStatus: AiAgentsStatus
   initialSectionId: string | null
   locale: AppLocale
+  researchLabMode: ResearchLabModeConfig
   systemLocale: AppLocale
+  vaultFolders: FolderNode[]
   isGitVault: boolean
   explicitOrganizationEnabled: boolean
 }
@@ -365,6 +367,7 @@ function SettingsPanelInner({
   aiAgentsStatus,
   initialSectionId,
   locale,
+  systemLocale,
   onSave,
   onCopyMcpConfig,
   vaults,
@@ -508,6 +511,7 @@ function SettingsPanelInner({
           t={t}
           draft={draft}
           locale={locale}
+          systemLocale={systemLocale}
           updateDraft={updateDraft}
           isGitVault={isGitVault}
           aiAgentsStatus={aiAgentsStatus}
@@ -557,6 +561,7 @@ interface SettingsBodyFromDraftProps {
   t: Translate
   draft: SettingsDraft
   locale: AppLocale
+  systemLocale: AppLocale
   updateDraft: <Key extends keyof SettingsDraft>(key: Key, value: SettingsDraft[Key]) => void
   isGitVault: boolean
   aiAgentsStatus: AiAgentsStatus
@@ -581,6 +586,7 @@ function SettingsBodyFromDraft({
   t,
   draft,
   locale,
+  systemLocale,
   updateDraft,
   isGitVault,
   aiAgentsStatus,
@@ -604,6 +610,7 @@ function SettingsBodyFromDraft({
     <SettingsBody
       t={t}
       locale={locale}
+      systemLocale={systemLocale}
       pullInterval={draft.pullInterval}
       setPullInterval={(value) => updateDraft('pullInterval', value)}
       isGitVault={isGitVault}
@@ -629,6 +636,8 @@ function SettingsBodyFromDraft({
       setReleaseChannel={(value) => updateDraft('releaseChannel', value)}
       themeMode={draft.themeMode}
       setThemeMode={setThemeMode}
+      uiLanguage={draft.uiLanguage}
+      setUiLanguage={(value) => updateDraft('uiLanguage', value)}
       dateDisplayFormat={draft.dateDisplayFormat}
       setDateDisplayFormat={(value) => updateDraft('dateDisplayFormat', value)}
       defaultNoteWidth={draft.defaultNoteWidth}

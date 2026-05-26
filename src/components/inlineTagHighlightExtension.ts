@@ -7,7 +7,8 @@ import { getTagStyle } from '../utils/tagStyles'
 
 type EditorViewLike = NonNullable<ReturnType<typeof useCreateBlockNote>['prosemirrorView']>
 type ProsemirrorDoc = EditorViewLike['state']['doc']
-type ProsemirrorTextNode = ProsemirrorDoc['type']['schema']['nodes'][string]
+type ProsemirrorNode = ProsemirrorDoc
+type ProsemirrorMark = ProsemirrorNode['marks'][number]
 
 const INLINE_TAG_PLUGIN_KEY = new PluginKey<DecorationSet>('rich-editor-inline-tags')
 const SKIPPED_PARENT_TYPES = new Set(['heading', 'codeBlock', 'link'])
@@ -15,7 +16,7 @@ const SKIPPED_MARK_TYPES = new Set(['code', 'link'])
 
 const decorationStyleCache = new Map<string, string>()
 
-function shouldSkipTextNode(parentTypeName: string | undefined, marks: ProsemirrorTextNode['marks']): boolean {
+function shouldSkipTextNode(parentTypeName: string | undefined, marks: readonly ProsemirrorMark[]): boolean {
   if (parentTypeName && SKIPPED_PARENT_TYPES.has(parentTypeName)) return true
   return marks.some((mark) => SKIPPED_MARK_TYPES.has(mark.type.name))
 }
@@ -34,7 +35,7 @@ function inlineTagDecorationStyle(tag: string): string {
 export function buildRichEditorInlineTagDecorations(doc: ProsemirrorDoc): DecorationSet {
   const decorations: Decoration[] = []
 
-  doc.descendants((node, pos, parent) => {
+  doc.descendants((node: ProsemirrorNode, pos: number, parent: ProsemirrorNode | null) => {
     if (!node.isText || !node.text) return
     if (shouldSkipTextNode(parent?.type.name, node.marks)) return
 

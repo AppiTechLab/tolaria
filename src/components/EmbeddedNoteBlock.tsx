@@ -59,18 +59,19 @@ export function EmbeddedNoteBlock({ source, target }: EmbeddedNoteBlockProps) {
     [entries, sourceEntry, target],
   )
   const title = targetEntry?.title ?? fallbackTitle(source, target)
+  const targetEntryPath = targetEntry?.path ?? null
   const navigationTarget = useMemo(() => {
     if (targetEntry && vaultPath) {
       return canonicalWikilinkTargetForEntry(targetEntry, vaultPath, sourceEntry)
     }
     return rawNavigationTarget(target)
   }, [sourceEntry, target, targetEntry, vaultPath])
-  const displayedBodyMarkdown = targetEntry && loadState.targetPath === targetEntry.path && loadState.status === 'loaded'
+  const displayedBodyMarkdown = targetEntryPath !== null && loadState.targetPath === targetEntryPath && loadState.status === 'loaded'
     ? loadState.bodyMarkdown
     : ''
-  const isLoading = Boolean(targetEntry) && loadState.targetPath !== targetEntry.path
+  const isLoading = targetEntryPath !== null && loadState.targetPath !== targetEntryPath
   const isUnavailable = !targetEntry
-    || (Boolean(targetEntry) && loadState.targetPath === targetEntry.path && loadState.status === 'unavailable')
+    || (targetEntryPath !== null && loadState.targetPath === targetEntryPath && loadState.status === 'unavailable')
 
   useEffect(() => {
     let canceled = false

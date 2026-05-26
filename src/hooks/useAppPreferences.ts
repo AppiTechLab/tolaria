@@ -4,10 +4,11 @@ import type { ThemeMode } from '../lib/themeMode'
 import {
   DEFAULT_APP_LOCALE,
   SYSTEM_UI_LANGUAGE,
+  type AppLocale,
   type UiLanguagePreference,
 } from '../lib/i18n'
 import { DEFAULT_DATE_DISPLAY_FORMAT, normalizeDateDisplayFormat, type DateDisplayFormat } from '../utils/dateDisplay'
-import { resolveAllNotesFileVisibility } from '../utils/allNotesFileVisibility'
+import { resolveAllNotesFileVisibility, type AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import { useAiAgentPreferences } from './useAiAgentPreferences'
 import type { AiAgentsStatus } from '../lib/aiAgents'
 import { useDocumentThemeMode } from './useDocumentThemeMode'
@@ -24,6 +25,19 @@ interface AppPreferencesConfig {
 
 interface AppPreferenceValues {
   dateDisplayFormat: DateDisplayFormat
+}
+
+interface UseAppPreferencesResult {
+  aiAgentPreferences: ReturnType<typeof useAiAgentPreferences>
+  allNotesFileVisibility: AllNotesFileVisibility
+  appLocale: AppLocale
+  dateDisplayFormat: DateDisplayFormat
+  documentThemeMode: ThemeMode
+  handleSetThemeMode: (theme_mode: ThemeMode) => void
+  handleSetUiLanguage: (uiLanguage: UiLanguagePreference) => void
+  handleToggleThemeMode: () => void
+  selectedUiLanguage: UiLanguagePreference
+  systemLocale: AppLocale
 }
 
 const DEFAULT_APP_PREFERENCES: AppPreferenceValues = {
@@ -53,7 +67,7 @@ export function useAppPreferences({
   saveSettings,
   settings,
   settingsLoaded,
-}: AppPreferencesConfig) {
+}: AppPreferencesConfig): UseAppPreferencesResult {
   const systemLocale = DEFAULT_APP_LOCALE
   const appLocale = DEFAULT_APP_LOCALE
   const dateDisplayFormat = useMemo(

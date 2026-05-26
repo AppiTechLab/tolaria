@@ -1217,20 +1217,18 @@ function useSuggestionMenuItems(options: {
         : HASHTAG_MIN_QUERY
     if (normalizedQuery.length < minLength) return null
 
-    const candidates = triggerCharacter === '[['
-      ? preFilterWikilinks(baseItems, normalizedQuery)
-      : triggerCharacter === '@'
-        ? filterPersonMentions(baseItems, normalizedQuery)
-        : filterHashtagSuggestions(baseHashtagItems, normalizedQuery)
-
     if (triggerCharacter === '#') {
       return buildHashtagSuggestionItems({
-        items: candidates,
+        items: filterHashtagSuggestions(baseHashtagItems, normalizedQuery),
         query: normalizedQuery,
         insertHashtag,
         runEditorAction,
       })
     }
+
+    const candidates = triggerCharacter === '[['
+      ? preFilterWikilinks(baseItems, normalizedQuery)
+      : filterPersonMentions(baseItems, normalizedQuery)
 
     const items = attachClickHandlers(candidates, insertWikilink, vaultPath ?? '', sourceEntry)
     return guardSuggestionMenuItems(

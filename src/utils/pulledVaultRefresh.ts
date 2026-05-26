@@ -117,13 +117,13 @@ export async function refreshPulledVaultState(options: PulledVaultRefreshOptions
   if (isActivePathBlocked({ activeTabPath, latestActiveTabPath, hasUnsavedChanges })) return entries
 
   const activePath = latestActiveTabPath as string
-  const refreshedEntry = findByNotePath(entries, activePath)
+  const refreshedEntry = findByNotePath(entries, activePath) ?? null
   const movedEntry = refreshedEntry ? null : findExternallyMovedActiveEntry({
     activeTabPath: activePath,
     entries,
     updatedFiles,
     vaultPath,
-  })
+  }) ?? null
   const replacementEntry = refreshedEntry ?? movedEntry
 
   if (replacementEntry && shouldReplaceActiveEntry({

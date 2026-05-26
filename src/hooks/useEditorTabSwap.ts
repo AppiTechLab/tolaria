@@ -635,7 +635,7 @@ function currentCursorBlockSnapshot(editor: ReturnType<typeof useCreateBlockNote
   if (!id) return { id: null, type: null }
 
   const block = Array.isArray(editor.document)
-    ? editor.document.find((candidate) => (
+    ? editor.document.find((candidate: unknown) => (
         typeof candidate === 'object'
         && candidate !== null
         && 'id' in candidate

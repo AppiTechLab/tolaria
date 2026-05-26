@@ -188,7 +188,7 @@ export function TasksQueryBlock({ query }: TasksQueryBlockProps) {
         current ? { ...current, [task.path]: updatedContent } : current
       ))
       setLoadError(null)
-      trackEvent('tasks_query_task_toggled', { checked: nextChecked })
+      trackEvent('tasks_query_task_toggled', { checked: nextChecked ? 1 : 0 })
     } catch (error) {
       setLoadError(errorMessage(error))
     } finally {

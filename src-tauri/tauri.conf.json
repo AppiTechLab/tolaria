@@ -60,8 +60,8 @@
       }
     },
     "resources": {
-      "resources/mcp-server/**/*": "mcp-server/",
-      "resources/agent-docs/**/*": "agent-docs/"
+      "resources/mcp-server/": "mcp-server/",
+      "resources/agent-docs/": "agent-docs/"
     },
     "icon": [
       "icons/32x32.png",

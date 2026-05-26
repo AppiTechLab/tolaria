@@ -31,7 +31,7 @@ import { SIDEBAR_SECTION_CONTENT_PADDING_BOTTOM } from './sidebarStyles'
 import { countByFilter } from '../../utils/noteListHelpers'
 import { viewIdentityKey, viewSelectionForView } from '../../utils/viewIdentity'
 import { normalizeVaultRelativePath, vaultRelativePathLabel } from '../../utils/notePathIdentity'
-import { translate, type AppLocale } from '../../lib/i18n'
+import { translate, type AppLocale, type TranslationKey } from '../../lib/i18n'
 import type { ResearchLabDomainKey, ResearchLabModeConfig } from '../../types'
 
 export { SidebarTopNav } from './SidebarTopNav'
@@ -40,7 +40,7 @@ export { FavoritesSection } from './FavoritesSection'
 const LAB_HOME_SECTION_ITEMS: Array<{
   id: string
   key: ResearchLabDomainKey
-  labelKey: string
+  labelKey: TranslationKey
   icon: typeof FolderSimple
   color: string
 }> = [

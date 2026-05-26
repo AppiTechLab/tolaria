@@ -17,7 +17,7 @@
     "l10n:translate:force": "lara-cli translate --force",
     "l10n:validate": "node scripts/validate-locales.mjs",
     "preview": "vite preview",
-    "tauri": "tauri",
+    "tauri": "node scripts/run-tauri.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
