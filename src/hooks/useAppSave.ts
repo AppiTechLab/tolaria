@@ -212,11 +212,35 @@ async function reloadAutoRenamedNote(
     restoreEditorFocus?: boolean
   },
 ): Promise<void> {
+  const existingTab = tabsRef.current.find((tab) => tab.entry.path === oldPath) ?? null
+  const activeTabWasRenamed = activeTabPathRef.current === oldPath
+  const optimisticContent = existingTab?.content ?? ''
+  const optimisticFilename = newPath.split('/').pop() ?? newPath
+  const optimisticEntry = existingTab
+    ? {
+        ...existingTab.entry,
+        path: newPath,
+        filename: optimisticFilename,
+        title: extractH1TitleFromContent(optimisticContent) ?? existingTab.entry.title,
+      }
+    : null
+
+  if (activeTabWasRenamed && optimisticEntry) {
+    startTransition(() => {
+      setTabs((prev: TabState[]) => prev.map((tab) => (
+        tab.entry.path === oldPath
+          ? { entry: optimisticEntry, content: optimisticContent }
+          : tab
+      )))
+      handleSwitchTab(newPath)
+    })
+  }
+
   const newEntry = await invoke<VaultEntry>('reload_vault_entry', { path: newPath })
   const diskContent = await invoke<string>('get_note_content', { path: newPath })
   const preservedContent = preferDiskContent
     ? diskContent
-    : tabsRef.current.find((tab) => tab.entry.path === oldPath)?.content ?? diskContent
+    : tabsRef.current.find((tab) => tab.entry.path === newPath || tab.entry.path === oldPath)?.content ?? diskContent
 
   const otherTabPaths = tabsRef.current
     .filter((tab) => tab.entry.path !== oldPath && tab.entry.path !== newPath)
@@ -224,11 +248,11 @@ async function reloadAutoRenamedNote(
 
   startTransition(() => {
     setTabs((prev: TabState[]) => prev.map((tab) => (
-      tab.entry.path === oldPath
+      tab.entry.path === oldPath || tab.entry.path === newPath
         ? { entry: { ...tab.entry, ...newEntry, path: newPath }, content: preservedContent }
         : tab
     )))
-    if (activeTabPathRef.current === oldPath) handleSwitchTab(newPath)
+    if (!activeTabWasRenamed && activeTabPathRef.current === oldPath) handleSwitchTab(newPath)
     replaceEntry(oldPath, { ...newEntry, path: newPath }, preservedContent)
   })
 
@@ -354,6 +378,8 @@ function useUntitledRenameExecutor({
         onInternalVaultWrite?.(path)
         onInternalVaultWrite?.(result.new_path)
         trackRenamedPath(renamedPathsRef.current, path, result.new_path)
+        flushLiveEditorContent?.(path)
+        const persistedRenamedContent = await savePendingForPathRef.current?.(path) ?? false
         await reloadAutoRenamedNote({
           oldPath: path,
           newPath: result.new_path,
@@ -363,7 +389,7 @@ function useUntitledRenameExecutor({
           handleSwitchTab,
           replaceEntry,
           loadModifiedFiles,
-          preferDiskContent: persistedLatestContent,
+          preferDiskContent: persistedLatestContent || persistedRenamedContent,
           restoreEditorFocus,
         })
         return result.new_path

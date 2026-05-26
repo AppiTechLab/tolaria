@@ -1022,4 +1022,46 @@ describe('useAppSave', () => {
       { path: oldPath, content: bodyDuringRename },
     ])
   })
+
+  it('flushes the latest live editor content again after the rename path is known before reload', async () => {
+    const renameDeferred = createDeferred<{ new_path: string; updated_files: number } | null>()
+    const initialContent = '# Fresh Title\n\nInitial body'
+    const bodyDuringRename = '# Fresh Title\n\nBody typed right before rename finishes'
+    let hookResult: ReturnType<typeof setupUntitledRenameHarness>['result'] | null = null
+    let flushCalls = 0
+
+    deps.flushLiveEditorContent = (path: string) => {
+      if (flushCalls > 0) hookResult?.current.handleContentChange(path, bodyDuringRename)
+      flushCalls += 1
+    }
+
+    const { result, oldPath, newPath, getTabs } = setupUntitledRenameHarness({
+      initialContent,
+      diskContent: initialContent,
+      autoRenameResult: renameDeferred.promise,
+    })
+    hookResult = result
+
+    await act(async () => {
+      result.current.handleContentChange(oldPath, initialContent)
+      await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 2_500)
+    })
+
+    expect(flushCalls).toBe(1)
+
+    await act(async () => {
+      renameDeferred.resolve({ new_path: newPath, updated_files: 0 })
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(flushCalls).toBe(2)
+
+    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content')
+    expect(saveCalls.at(-1)).toEqual([
+      'save_note_content',
+      { path: newPath, content: bodyDuringRename },
+    ])
+    expect(getTabs()[0].content).toBe(bodyDuringRename)
+  })
 })

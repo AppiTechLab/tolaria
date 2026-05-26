@@ -579,6 +579,17 @@ function shouldClearDomSelectionForScheduledSwap(options: {
   return !!cachedState && cachedState.sourceContent !== state.activeTab.content
 }
 
+function shouldFlushPendingChangeBeforePathTransition(options: {
+  state: TabSwapState
+  activeTabPath: string | null
+  editor: ReturnType<typeof useCreateBlockNote>
+}): boolean {
+  const { state, activeTabPath, editor } = options
+
+  if (!state.pathChanged) return false
+  return !isUntitledRenameTransition(state.prevPath, activeTabPath, state.activeTab, editor)
+}
+
 function cacheStableActivePath(options: {
   cache: Map<string, CachedTabState>
   activeTabPath: string | null
@@ -619,19 +630,30 @@ function currentCursorBlockId(editor: ReturnType<typeof useCreateBlockNote>): st
   }
 }
 
-function restoreCursorBlock(editor: ReturnType<typeof useCreateBlockNote>, blockId: string | null): void {
+function restoreCursorBlock(
+  editor: ReturnType<typeof useCreateBlockNote>,
+  blockId: string | null,
+  attempt = 0,
+): void {
   if (!blockId) return
 
   const setTextCursorPosition = (editor as {
     setTextCursorPosition?: (targetBlock: string, placement?: 'start' | 'end') => void
   }).setTextCursorPosition
+  const focus = (editor as { focus?: () => void }).focus
   if (typeof setTextCursorPosition !== 'function') return
 
   try {
     setTextCursorPosition(blockId, 'end')
+    focus?.()
   } catch {
-    // Ignore stale block ids if the preserved document no longer contains the prior cursor block.
+    // The preserved block can arrive a frame later than the path flip; retry below.
   }
+
+  if (currentCursorBlockId(editor) === blockId) return
+  if (attempt >= 4) return
+
+  requestNextFrame(() => restoreCursorBlock(editor, blockId, attempt + 1))
 }
 
 function preserveUntitledRenameState(options: {
@@ -1041,7 +1063,10 @@ function runTabSwapEffect(options: RunTabSwapEffectOptions) {
     rawModeJustEnded,
   })
   if (state.pathChanged) invalidatePendingSwap({ pendingSwapRef, swapSeqRef })
-  flushBeforePathChange({ pathChanged: state.pathChanged, flushPendingEditorChange })
+  flushBeforePathChange({
+    pathChanged: shouldFlushPendingChangeBeforePathTransition({ state, activeTabPath, editor }),
+    flushPendingEditorChange,
+  })
 
   if (shouldSkipScheduledTabSwap({
     state,

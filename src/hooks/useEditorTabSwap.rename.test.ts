@@ -239,7 +239,7 @@ describe('useEditorTabSwap untitled rename continuity', () => {
     })
 
     expect(onContentChange).toHaveBeenCalledWith(
-      expect.any(String),
+      renamedTab.entry.path,
       expect.stringContaining('Body typed right before rename'),
     )
   })
