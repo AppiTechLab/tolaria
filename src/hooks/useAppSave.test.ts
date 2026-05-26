@@ -558,7 +558,7 @@ describe('useAppSave', () => {
     window.addEventListener('laputa:focus-editor', focusListener)
 
     try {
-      const { result, oldPath, newPath } = setupUntitledRenameHarness()
+      const { result, oldPath } = setupUntitledRenameHarness()
       document.body.focus()
 
       await act(async () => {

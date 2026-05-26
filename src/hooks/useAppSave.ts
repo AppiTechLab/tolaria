@@ -919,7 +919,9 @@ export function useAppSave({
     persistenceScope: writableVaultPaths && writableVaultPaths.length > 0 ? writableVaultPaths : resolvedPath,
     locale,
   })
-  savePendingForPathRef.current = savePendingForPath
+  useEffect(() => {
+    savePendingForPathRef.current = savePendingForPath
+  }, [savePendingForPath])
   const replaceRenamedEntry = useReplaceRenamedEntry({ registerRenamedPath, replaceEntry })
   const { handleFilenameRename, handleSave, handleTitleSync, flushBeforeAction } = useAppSaveHandlers({
     contentChangeRef, handleContentChange, canPersist, cancelPendingUntitledRename,

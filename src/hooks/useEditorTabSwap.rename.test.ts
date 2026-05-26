@@ -218,7 +218,6 @@ describe('useEditorTabSwap untitled rename continuity', () => {
       renamedTab,
       result,
       rerender,
-      untitledTab,
     } = renderRenameHarness()
 
     await settleRenameHarness(editor)
