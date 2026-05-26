@@ -55,6 +55,70 @@ describe('useEditorTabSwap rich-editor serialization performance', () => {
     vi.restoreAllMocks()
   })
 
+  it('emits live rich-editor content immediately for untitled notes before the debounce flush', async () => {
+    installEditorDomSpies()
+    const untitledTab = {
+      entry: {
+        path: 'untitled-note-123.md',
+        title: 'Untitled Note 123',
+        filename: 'untitled-note-123.md',
+        type: 'Note',
+        status: 'Active',
+        aliases: [],
+        isA: '',
+      } as VaultEntry,
+      content: '---\ntype: Note\n---\n\n# Untitled Note 123\n\n',
+    }
+    const onContentChange = vi.fn()
+    const onLiveContentChange = vi.fn()
+    const docRef = { current: initialBlocks as unknown[] }
+    const editor = makeMockEditor(docRef)
+
+    const { result } = renderHook(() => useEditorTabSwap({
+      tabs: [untitledTab],
+      activeTabPath: untitledTab.entry.path,
+      rawMode: false,
+      editor: editor as never,
+      onContentChange,
+      onLiveContentChange,
+    }))
+    await flushEditorTick()
+
+    docRef.current = [{
+      id: 'heading-1',
+      type: 'heading',
+      props: { level: 1 },
+      content: [{ type: 'text', text: 'Obsidian', styles: {} }],
+      children: [],
+    }, {
+      id: 'paragraph-1',
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Body starts only after intentional Enter.', styles: {} }],
+      children: [],
+    }]
+    editor.blocksToMarkdownLossy.mockReturnValue('# Obsidian\n\nBody starts only after intentional Enter.\n')
+    editor.blocksToMarkdownLossy.mockClear()
+
+    act(() => {
+      result.current.handleEditorChange()
+    })
+
+    expect(onLiveContentChange).toHaveBeenCalledWith(
+      untitledTab.entry.path,
+      expect.stringContaining('Body starts only after intentional Enter.'),
+    )
+    expect(onContentChange).not.toHaveBeenCalled()
+
+    act(() => {
+      result.current.flushPendingEditorChange()
+    })
+
+    expect(onContentChange).toHaveBeenCalledWith(
+      untitledTab.entry.path,
+      expect.stringContaining('Body starts only after intentional Enter.'),
+    )
+  })
+
   it('does not reserialize when local rich-editor content catches up to tab state', async () => {
     installEditorDomSpies()
     const tab = makeTab('a.md', 'Note A')

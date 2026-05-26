@@ -170,8 +170,10 @@ export function focusEditorWithRetries(
   t0: number | undefined,
   attempt = 0,
 ): void {
-  editor.focus()
-  const hasFocus = ensureEditableFocus()
+  const hasFocus = ensureEditableFocus() || (() => {
+    editor.focus()
+    return ensureEditableFocus()
+  })()
   if (!hasFocus && attempt < MAX_FOCUS_ATTEMPTS) {
     requestAnimationFrame(() => focusEditorWithRetries(editor, selectTitle, t0, attempt + 1))
     return

@@ -68,7 +68,7 @@ async function selectTopNav(page: Page, label: string) {
 
 async function openCrlfInboxNote(page: Page) {
   await selectTopNav(page, 'Inbox')
-  const noteRow = page.locator(`[data-note-path="${crlfInboxNotePath()}"]`)
+  const noteRow = page.getByTestId('note-list-container').getByText('CRLF Inbox Syntax', { exact: true })
   await expect(noteRow).toBeVisible({ timeout: 5_000 })
   await noteRow.click()
   await expect(page.getByRole('heading', { name: 'CRLF Inbox Syntax', level: 1 })).toBeVisible({ timeout: 5_000 })
@@ -90,7 +90,7 @@ test.describe('multi-selection shortcuts', () => {
     await dispatchCommandShortcut(page, 'e', 'KeyE')
 
     await expect(page.getByTestId('bulk-action-bar')).toHaveCount(0)
-    await expect(page.getByText('All notes are organized')).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByText(/\d+ notes? organized/)).toBeVisible({ timeout: 5_000 })
   })
 
   test('Cmd/Ctrl+E organizes a CRLF Inbox note without duplicating frontmatter @smoke', async ({ page }) => {
@@ -107,9 +107,9 @@ test.describe('multi-selection shortcuts', () => {
     expect(organizedContent).toContain('type: Note')
     expect(organizedContent).toContain('related_to: "[[Alpha Project]]"')
 
-    await expect(page.locator(`[data-note-path="${crlfInboxNotePath()}"]`)).toHaveCount(0)
+    await expect(page.getByTestId('note-list-container').getByText('CRLF Inbox Syntax', { exact: true })).toHaveCount(0)
     await selectTopNav(page, 'All Notes')
-    await expect(page.locator(`[data-note-path="${crlfInboxNotePath()}"]`)).toBeVisible({ timeout: 5_000 })
+    await expect(page.getByTestId('note-list-container').getByText('CRLF Inbox Syntax', { exact: true })).toBeVisible({ timeout: 5_000 })
   })
 
   test('Cmd/Ctrl+Backspace batch-deletes the full visible multi-selection after one confirmation @smoke', async ({ page }) => {

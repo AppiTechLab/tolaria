@@ -1,6 +1,7 @@
 import { splitFrontmatter } from '../utils/wikilinks'
 import { slugifyNoteStem } from '../utils/noteSlug'
 import { isTauriAssetUrl } from '../utils/vaultAttachments'
+import { notePathFilename } from '../utils/notePathIdentity'
 
 type MarkdownContent = string
 type FilePath = string
@@ -58,7 +59,7 @@ export function replaceTitleInFrontmatter(frontmatter: Frontmatter, newTitle: No
 }
 
 export function pathStem(path: FilePath): PathStem {
-  const filename = path.split('/').pop() ?? path
+  const filename = notePathFilename(path)
   return filename.replace(/\.md$/, '')
 }
 

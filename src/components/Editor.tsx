@@ -96,6 +96,7 @@ interface EditorProps {
   onArchiveNote?: (path: string) => void
   onUnarchiveNote?: (path: string) => void
   onContentChange?: (path: string, content: string) => void
+  onLiveContentChange?: (path: string, content: string) => void
   onSave?: () => void
   onSwitchTab?: (path: string) => void
   onCloseTab?: (path: string) => void
@@ -269,6 +270,7 @@ interface EditorSetupParams {
   activeTabPath: string | null
   vaultPath?: string
   onContentChange?: (path: string, content: string) => void
+  onLiveContentChange?: (path: string, content: string) => void
   onLoadDiff?: (path: string) => Promise<string>
   onLoadDiffAtCommit?: (path: string, commitHash: string) => Promise<string>
   pendingCommitDiffRequest?: CommitDiffRequest | null
@@ -279,7 +281,7 @@ interface EditorSetupParams {
 }
 
 function useEditorSetup({
-  tabs, activeTabPath, vaultPath, onContentChange,
+  tabs, activeTabPath, vaultPath, onContentChange, onLiveContentChange,
   onLoadDiff, onLoadDiffAtCommit, pendingCommitDiffRequest, onPendingCommitDiffHandled, getNoteStatus,
   rawToggleRef, diffToggleRef,
 }: EditorSetupParams) {
@@ -329,7 +331,7 @@ function useEditorSetup({
   }, [activeTabPath, setPendingRawExitContent, tabs])
 
   const { handleEditorChange, flushPendingEditorChange, editorMountedRef } = useEditorTabSwap({
-    tabs: tabsForEditorSwap, activeTabPath, editor, onContentChange, rawMode, vaultPath,
+    tabs: tabsForEditorSwap, activeTabPath, editor, onContentChange, onLiveContentChange, rawMode, vaultPath,
   })
   useEffect(() => {
     flushPendingEditorChangeRef.current = flushPendingEditorChange
@@ -689,6 +691,7 @@ export const Editor = memo(function Editor(props: EditorProps) {
     activeTabPath: props.activeTabPath,
     vaultPath: props.vaultPath,
     onContentChange: props.onContentChange,
+    onLiveContentChange: props.onLiveContentChange,
     onLoadDiff: props.onLoadDiff,
     onLoadDiffAtCommit: props.onLoadDiffAtCommit,
     pendingCommitDiffRequest: props.pendingCommitDiffRequest,

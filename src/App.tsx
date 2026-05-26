@@ -66,6 +66,7 @@ import { useAppSave } from './hooks/useAppSave'
 import { useNoteRetargetingUi } from './hooks/useNoteRetargetingUi'
 import { useVaultBridge } from './hooks/useVaultBridge'
 import { useSavedViewOrdering } from './hooks/useSavedViewOrdering'
+import { isUntitledPath } from './hooks/editorTabContent'
 import { normalizeVaultRelativePath } from './utils/notePathIdentity'
 import {
   useNeighborhoodEntry,
@@ -637,11 +638,14 @@ function App() {
   const flushPendingEditorContentRef = useRef<((path: string) => void) | null>(null)
   const flushPendingRawContentRef = useRef<((path: string) => void) | null>(null)
   const appSaveFlushBeforeActionRef = useRef<((path: string) => Promise<unknown>) | null>(null)
-  const flushEditorStateBeforeAction = useCallback(async (path: string) => {
+  const flushLiveEditorContent = useCallback((path: string) => {
     flushPendingEditorContentRef.current?.(path)
     flushPendingRawContentRef.current?.(path)
-    await appSaveFlushBeforeActionRef.current?.(path)
   }, [])
+  const flushEditorStateBeforeAction = useCallback(async (path: string) => {
+    flushLiveEditorContent(path)
+    await appSaveFlushBeforeActionRef.current?.(path)
+  }, [flushLiveEditorContent])
   const handleCreatedVaultEntryPersisting = useCallback((path: string) => {
     markRecentVaultWrite(path)
     vault.addPendingSave(path)
@@ -827,6 +831,7 @@ function App() {
     replaceEntry: vault.replaceEntry, resolvedPath,
     writableVaultPaths,
     initialH1AutoRenameEnabled: settings.initial_h1_auto_rename_enabled !== false,
+    flushLiveEditorContent,
     onInternalVaultWrite: markRecentVaultWrite,
     locale: appLocale,
   })
@@ -1848,6 +1853,9 @@ function App() {
               onArchiveNote={activeDeletedFile ? undefined : entryActions.handleArchiveNote}
               onUnarchiveNote={activeDeletedFile ? undefined : entryActions.handleUnarchiveNote}
               onContentChange={handleTrackedContentChange}
+              onLiveContentChange={notes.activeTabPath && isUntitledPath(notes.activeTabPath)
+                ? appSave.handleLiveEditorContent
+                : undefined}
               onSave={handleTrackedSave}
               onSwitchTab={notes.handleSwitchTab}
               onCloseTab={notes.handleCloseTab}

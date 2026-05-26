@@ -154,16 +154,18 @@ function schedulePendingRename({
   pendingRenameRef,
   path,
   title,
+  forceReschedule = false,
   onFire,
 }: {
   pendingRenameRef: MutableRefObject<PendingUntitledRename | null>
   path: string
   title: string
+  forceReschedule?: boolean
   onFire: (path: string) => void
 },
 ): void {
   const currentPending = pendingRenameRef.current
-  if (currentPending?.path === path && currentPending.title === title) return
+  if (!forceReschedule && currentPending?.path === path && currentPending.title === title) return
   takePendingRename({ pendingRenameRef })
   const timer = setTimeout(() => {
     const pending = takePendingRename({ pendingRenameRef, path })
@@ -195,6 +197,8 @@ async function reloadAutoRenamedNote(
     handleSwitchTab,
     replaceEntry,
     loadModifiedFiles,
+    preferDiskContent = false,
+    restoreEditorFocus = false,
   }: {
     oldPath: string
     newPath: string
@@ -204,11 +208,15 @@ async function reloadAutoRenamedNote(
     handleSwitchTab: AppSaveDeps['handleSwitchTab']
     replaceEntry: AppSaveDeps['replaceEntry']
     loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
+    preferDiskContent?: boolean
+    restoreEditorFocus?: boolean
   },
 ): Promise<void> {
   const newEntry = await invoke<VaultEntry>('reload_vault_entry', { path: newPath })
-  const preservedContent = tabsRef.current.find((tab) => tab.entry.path === oldPath)?.content
-    ?? await invoke<string>('get_note_content', { path: newPath })
+  const diskContent = await invoke<string>('get_note_content', { path: newPath })
+  const preservedContent = preferDiskContent
+    ? diskContent
+    : tabsRef.current.find((tab) => tab.entry.path === oldPath)?.content ?? diskContent
 
   const otherTabPaths = tabsRef.current
     .filter((tab) => tab.entry.path !== oldPath && tab.entry.path !== newPath)
@@ -223,6 +231,35 @@ async function reloadAutoRenamedNote(
     if (activeTabPathRef.current === oldPath) handleSwitchTab(newPath)
     replaceEntry(oldPath, { ...newEntry, path: newPath }, preservedContent)
   })
+
+  if (restoreEditorFocus && typeof window !== 'undefined') {
+    const restoreFocusIfNeeded = () => {
+      const activeElement = document.activeElement
+      const editorStillHasFocus = activeElement instanceof Element
+        && ((activeElement as HTMLElement).isContentEditable || activeElement.closest('[contenteditable="true"]') !== null)
+      if (editorStillHasFocus) return
+
+      window.dispatchEvent(new CustomEvent('laputa:focus-editor'))
+    }
+
+    const handleTabSwap = (event: Event) => {
+      if ((event as CustomEvent).detail?.path !== newPath) return
+      cleanupFocusRecovery()
+      restoreFocusIfNeeded()
+    }
+
+    const fallbackTimer = window.setTimeout(() => {
+      cleanupFocusRecovery()
+      restoreFocusIfNeeded()
+    }, 120)
+
+    const cleanupFocusRecovery = () => {
+      window.clearTimeout(fallbackTimer)
+      window.removeEventListener('laputa:editor-tab-swapped', handleTabSwap)
+    }
+
+    window.addEventListener('laputa:editor-tab-swapped', handleTabSwap)
+  }
 
   void Promise.all(otherTabPaths.map(async (path) => {
     const content = await invoke<string>('get_note_content', { path })
@@ -281,6 +318,8 @@ function useUntitledRenameExecutor({
   handleSwitchTab,
   replaceEntry,
   loadModifiedFiles,
+  flushLiveEditorContent,
+  savePendingForPathRef,
   onInternalVaultWrite,
   renamedPathsRef,
   inFlightUntitledRenameRef,
@@ -292,6 +331,8 @@ function useUntitledRenameExecutor({
   handleSwitchTab: AppSaveDeps['handleSwitchTab']
   replaceEntry: AppSaveDeps['replaceEntry']
   loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
+  flushLiveEditorContent?: AppSaveDeps['flushLiveEditorContent']
+  savePendingForPathRef: MutableRefObject<((path: string) => Promise<boolean>) | null>
   onInternalVaultWrite?: AppSaveDeps['onInternalVaultWrite']
   renamedPathsRef: MutableRefObject<RenamedPathMap>
   inFlightUntitledRenameRef: MutableRefObject<InFlightRenameMap>
@@ -302,6 +343,9 @@ function useUntitledRenameExecutor({
 
     const renamePromise = (async () => {
       try {
+        flushLiveEditorContent?.(path)
+        const persistedLatestContent = await savePendingForPathRef.current?.(path) ?? false
+        const restoreEditorFocus = activeTabPathRef.current === path
         const renameVaultPath = vaultPathForTabPath(tabsRef.current, path, resolvedPath)
         const result = await invoke<{ new_path: string; updated_files: number } | null>('auto_rename_untitled', {
           args: { vaultPath: renameVaultPath, notePath: path },
@@ -319,6 +363,8 @@ function useUntitledRenameExecutor({
           handleSwitchTab,
           replaceEntry,
           loadModifiedFiles,
+          preferDiskContent: persistedLatestContent,
+          restoreEditorFocus,
         })
         return result.new_path
       } catch {
@@ -338,6 +384,8 @@ function useUntitledRenameExecutor({
     handleSwitchTab,
     replaceEntry,
     loadModifiedFiles,
+    flushLiveEditorContent,
+    savePendingForPathRef,
     onInternalVaultWrite,
     renamedPathsRef,
     inFlightUntitledRenameRef,
@@ -363,7 +411,7 @@ function useUntitledRenameScheduler({
     return executeUntitledRename(pending.path)
   }, [executeUntitledRename])
 
-  const scheduleUntitledRename = useCallback((path: string, content: string) => {
+  const scheduleUntitledRename = useCallback((path: string, content: string, forceReschedule = false) => {
     const title = schedulableUntitledRenameTitle({ path, content, initialH1AutoRenameEnabled })
     if (!title) {
       cancelPendingUntitledRename(path)
@@ -374,6 +422,7 @@ function useUntitledRenameScheduler({
       pendingRenameRef: pendingUntitledRenameRef,
       path,
       title,
+      forceReschedule,
       onFire: (pendingPath) => {
         void executeUntitledRename(pendingPath)
       },
@@ -402,6 +451,8 @@ function useUntitledRenameCoordinator({
   handleSwitchTab,
   replaceEntry,
   loadModifiedFiles,
+  flushLiveEditorContent,
+  savePendingForPathRef,
   onInternalVaultWrite,
   initialH1AutoRenameEnabled,
 }: {
@@ -412,6 +463,8 @@ function useUntitledRenameCoordinator({
   handleSwitchTab: AppSaveDeps['handleSwitchTab']
   replaceEntry: AppSaveDeps['replaceEntry']
   loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
+  flushLiveEditorContent?: AppSaveDeps['flushLiveEditorContent']
+  savePendingForPathRef: MutableRefObject<((path: string) => Promise<boolean>) | null>
   onInternalVaultWrite?: AppSaveDeps['onInternalVaultWrite']
   initialH1AutoRenameEnabled: boolean
 }) {
@@ -430,6 +483,8 @@ function useUntitledRenameCoordinator({
     handleSwitchTab,
     replaceEntry,
     loadModifiedFiles,
+    flushLiveEditorContent,
+    savePendingForPathRef,
     onInternalVaultWrite,
     renamedPathsRef,
     inFlightUntitledRenameRef,
@@ -472,6 +527,7 @@ interface AppSaveDeps {
   resolvedPath: string
   writableVaultPaths?: readonly string[]
   initialH1AutoRenameEnabled: boolean
+  flushLiveEditorContent?: (path: string) => void
   onInternalVaultWrite?: (path: string) => void
   locale?: AppLocale
 }
@@ -486,7 +542,7 @@ interface EditorPersistenceOptions {
   onInternalVaultWrite?: AppSaveDeps['onInternalVaultWrite']
   reloadViews: AppSaveDeps['reloadViews']
   refreshPendingUntitledRename: (path: string, content: string) => void
-  scheduleUntitledRename: (path: string, content: string) => void
+  scheduleUntitledRename: (path: string, content: string, forceReschedule?: boolean) => void
   resolveCurrentPath: (path: string) => string
   resolvePathBeforeSave: (path: string) => Promise<string>
   canPersist: boolean
@@ -840,10 +896,11 @@ export function useAppSave({
   updateEntry, setTabs, handleSwitchTab, setToastMessage, loadModifiedFiles,
   reloadViews, trackUnsaved, clearUnsaved, unsavedPaths, tabs, activeTabPath,
   handleRenameNote, handleRenameFilename: handleRenameFilenameRaw, replaceEntry,
-  resolvedPath, writableVaultPaths, initialH1AutoRenameEnabled, onInternalVaultWrite,
+  resolvedPath, writableVaultPaths, initialH1AutoRenameEnabled, flushLiveEditorContent, onInternalVaultWrite,
   locale = 'en',
 }: AppSaveDeps) {
   const contentChangeRef = useRef<(path: string, content: string) => void>(() => {})
+  const savePendingForPathRef = useRef<((path: string) => Promise<boolean>) | null>(null)
   const canPersist = resolvedPath.trim().length > 0
   const { tabsRef, activeTabPathRef, unsavedPathsRef } = useAppSaveStateRefs({ tabs, activeTabPath, unsavedPaths })
   const {
@@ -852,7 +909,8 @@ export function useAppSave({
     refreshPendingUntitledRename, scheduleUntitledRename,
   } = useUntitledRenameCoordinator({
     resolvedPath, tabsRef, activeTabPathRef, setTabs, handleSwitchTab,
-    replaceEntry, loadModifiedFiles, onInternalVaultWrite, initialH1AutoRenameEnabled,
+    replaceEntry, loadModifiedFiles, flushLiveEditorContent, savePendingForPathRef,
+    onInternalVaultWrite, initialH1AutoRenameEnabled,
   })
   const { handleSaveRaw, handleContentChange, savePendingForPath, savePending } = useEditorPersistence({
     updateEntry, setTabs, setToastMessage, loadModifiedFiles, trackUnsaved,
@@ -861,6 +919,7 @@ export function useAppSave({
     persistenceScope: writableVaultPaths && writableVaultPaths.length > 0 ? writableVaultPaths : resolvedPath,
     locale,
   })
+  savePendingForPathRef.current = savePendingForPath
   const replaceRenamedEntry = useReplaceRenamedEntry({ registerRenamedPath, replaceEntry })
   const { handleFilenameRename, handleSave, handleTitleSync, flushBeforeAction } = useAppSaveHandlers({
     contentChangeRef, handleContentChange, canPersist, cancelPendingUntitledRename,
@@ -869,9 +928,13 @@ export function useAppSave({
     handleRenameFilename: handleRenameFilenameRaw,
     resolvedPath, replaceRenamedEntry, loadModifiedFiles, handleSaveRaw, tabs, unsavedPaths,
   })
+  const handleLiveEditorContent = useCallback((path: string, content: string) => {
+    scheduleUntitledRename(path, content, true)
+  }, [scheduleUntitledRename])
 
   return {
     contentChangeRef, handleContentChange, handleFilenameRename, handleSave,
-    handleTitleSync, savePending, savePendingForPath, trackRenamedPath: registerRenamedPath, flushBeforeAction,
+    handleTitleSync, handleLiveEditorContent, savePending, savePendingForPath,
+    trackRenamedPath: registerRenamedPath, flushBeforeAction,
   }
 }

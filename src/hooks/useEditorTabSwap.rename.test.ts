@@ -11,14 +11,17 @@ function makeTab(path: string, title: string, body: string) {
 
 function makeMockEditor(currentMarkdown: string) {
   const markdownRef = { current: currentMarkdown }
+  const cursorBlockIdRef = { current: 'body' }
   const docRef = {
     current: [
       {
+        id: 'title',
         type: 'heading',
         props: { level: 1 },
         content: [{ type: 'text', text: 'Fresh Title', styles: {} }],
       },
       {
+        id: 'body',
         type: 'paragraph',
         content: [{ type: 'text', text: 'Body typed live', styles: {} }],
       },
@@ -34,6 +37,10 @@ function makeMockEditor(currentMarkdown: string) {
     blocksToMarkdownLossy: vi.fn(() => markdownRef.current),
     blocksToHTMLLossy: vi.fn(() => ''),
     tryParseMarkdownToBlocks: vi.fn(() => []),
+    getTextCursorPosition: vi.fn(() => ({ block: { id: cursorBlockIdRef.current } })),
+    setTextCursorPosition: vi.fn((blockId: string) => {
+      cursorBlockIdRef.current = blockId
+    }),
     _tiptapEditor: { commands: { setContent: vi.fn() } },
     setMarkdown: (markdown: string) => {
       markdownRef.current = markdown
@@ -53,6 +60,7 @@ function renderRenameHarness(options?: { onContentChange?: ReturnType<typeof vi.
   const onContentChange = options?.onContentChange ?? vi.fn()
   const untitledTab = makeTab('untitled-note-123.md', 'Untitled Note 123', 'Body')
   const renamedTab = makeTab('fresh-title.md', 'Fresh Title', 'Body')
+  const onLiveContentChange = vi.fn()
 
   const hook = renderHook(
     ({ tabs, activeTabPath }) => useEditorTabSwap({
@@ -60,6 +68,7 @@ function renderRenameHarness(options?: { onContentChange?: ReturnType<typeof vi.
       activeTabPath,
       editor: editor as never,
       onContentChange,
+      onLiveContentChange,
     }),
     { initialProps: { tabs: [untitledTab], activeTabPath: untitledTab.entry.path } },
   )
@@ -67,6 +76,7 @@ function renderRenameHarness(options?: { onContentChange?: ReturnType<typeof vi.
   return {
     editor,
     onContentChange,
+    onLiveContentChange,
     untitledTab,
     renamedTab,
     ...hook,
@@ -115,10 +125,57 @@ async function expectRenameSessionContinues(options: { renamedTabArrivesLate: bo
   )
 }
 
+async function expectWindowsRenameSessionContinues(options: { renamedTabArrivesLate: boolean }) {
+  const editor = makeMockEditor('# Fresh Title\n\nBody typed live')
+  const onContentChange = vi.fn()
+  const untitledTab = makeTab('C:\\vault\\untitled-note-123.md', 'Untitled Note 123', 'Body')
+  const renamedTab = makeTab('C:\\vault\\fresh-title.md', 'Fresh Title', 'Body')
+
+  const { result, rerender } = renderHook(
+    ({ tabs, activeTabPath }) => useEditorTabSwap({
+      tabs,
+      activeTabPath,
+      editor: editor as never,
+      onContentChange,
+    }),
+    { initialProps: { tabs: [untitledTab], activeTabPath: untitledTab.entry.path } },
+  )
+
+  await settleRenameHarness(editor)
+
+  if (options.renamedTabArrivesLate) {
+    rerender({ tabs: [untitledTab], activeTabPath: renamedTab.entry.path })
+    await act(() => new Promise(r => setTimeout(r, 0)))
+  }
+
+  rerender({ tabs: [renamedTab], activeTabPath: renamedTab.entry.path })
+  await act(() => new Promise(r => setTimeout(r, 0)))
+
+  expect(editor.replaceBlocks).not.toHaveBeenCalled()
+  expect(editor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
+
+  act(() => {
+    result.current.handleEditorChange()
+  })
+  act(() => {
+    result.current.flushPendingEditorChange()
+  })
+
+  expect(onContentChange).toHaveBeenCalledWith(
+    'C:\\vault\\fresh-title.md',
+    expect.stringContaining('Body typed live'),
+  )
+}
+
 describe('useEditorTabSwap untitled rename continuity', () => {
   it('keeps the live editor session when an untitled note auto-renames', async () => {
     setupMountedEditorMocks()
     await expectRenameSessionContinues({ renamedTabArrivesLate: false })
+  })
+
+  it('keeps the live editor session when a Windows untitled note auto-renames', async () => {
+    setupMountedEditorMocks()
+    await expectWindowsRenameSessionContinues({ renamedTabArrivesLate: false })
   })
 
   it('still swaps when the next note does not match the live untitled body', async () => {
@@ -150,6 +207,47 @@ describe('useEditorTabSwap untitled rename continuity', () => {
   it('keeps the live editor session when the renamed tab arrives one render after the path switch', async () => {
     setupMountedEditorMocks()
     await expectRenameSessionContinues({ renamedTabArrivesLate: true })
+  })
+
+  it('remaps pending local typing when the untitled path flips to the renamed path mid-edit', async () => {
+    setupMountedEditorMocks()
+
+    const {
+      editor,
+      onContentChange,
+      renamedTab,
+      result,
+      rerender,
+      untitledTab,
+    } = renderRenameHarness()
+
+    await settleRenameHarness(editor)
+
+    editor.setMarkdown('# Fresh Title\n\nBody typed right before rename')
+    act(() => {
+      result.current.handleEditorChange()
+    })
+
+    rerender({ tabs: [renamedTab], activeTabPath: renamedTab.entry.path })
+    await act(() => new Promise(r => setTimeout(r, 0)))
+
+    expect(editor.replaceBlocks).not.toHaveBeenCalled()
+    expect(editor.tryParseMarkdownToBlocks).not.toHaveBeenCalled()
+    expect(editor.setTextCursorPosition).toHaveBeenCalledWith('body', 'end')
+
+    act(() => {
+      result.current.flushPendingEditorChange()
+    })
+
+    expect(onContentChange).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.stringContaining('Body typed right before rename'),
+    )
+  })
+
+  it('keeps the live editor session when a Windows renamed tab arrives one render after the path switch', async () => {
+    setupMountedEditorMocks()
+    await expectWindowsRenameSessionContinues({ renamedTabArrivesLate: true })
   })
 
   it('does not re-swap the active note when app state catches up with live typing', async () => {

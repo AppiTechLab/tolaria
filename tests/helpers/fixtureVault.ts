@@ -447,6 +447,12 @@ async function waitForFixtureVaultReady({ page, expectedTitle }: FixturePageArgs
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.list_vault))
   await page.locator('[data-testid="note-list-container"]').waitFor({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
+  await expect(page.getByTestId('note-list-loading-skeleton')).toHaveCount(0, {
+    timeout: FIXTURE_VAULT_READY_TIMEOUT,
+  })
+  await expect(page.getByTestId('status-vault-reloading')).toHaveCount(0, {
+    timeout: FIXTURE_VAULT_READY_TIMEOUT,
+  })
   await expect(page.getByText(expectedTitle, { exact: true }).first()).toBeVisible({
     timeout: FIXTURE_VAULT_READY_TIMEOUT,
   })

@@ -23,8 +23,12 @@ function syncWindowContent(): void {
   }
 }
 
+function mockPathFilename(path: string): string {
+  return path.replaceAll('\\', '/').split('/').pop() ?? 'unknown'
+}
+
 function mockFileHistory(path: string) {
-  const filename = path.split('/').pop()?.replace('.md', '') ?? 'unknown'
+  const filename = mockPathFilename(path).replace(/\.md$/i, '')
   const ts = Math.floor(Date.now() / 1000)
   return [
     { hash: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0', shortHash: 'a1b2c3d', message: `Update ${filename} with latest changes`, author: 'Luca Rossi', date: ts - 86400 * 2 },
@@ -44,7 +48,7 @@ function mockModifiedFiles(): ModifiedFile[] {
 }
 
 function mockFileDiff(path: string): string {
-  const filename = path.split('/').pop() ?? 'unknown'
+  const filename = mockPathFilename(path)
   if (filename === 'old-draft.md') {
     return `diff --git a/${filename} b/${filename}
 deleted file mode 100644
@@ -81,7 +85,7 @@ index abc1234..def5678 100644
 }
 
 function mockFileDiffAtCommit(path: string, commitHash: string): string {
-  const filename = path.split('/').pop() ?? 'unknown'
+  const filename = mockPathFilename(path)
   const shortHash = commitHash.slice(0, 7)
   return `diff --git a/${filename} b/${filename}
 index abc1234..${shortHash} 100644

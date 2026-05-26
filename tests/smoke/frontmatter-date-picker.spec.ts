@@ -19,7 +19,11 @@ function alphaProjectPath(vaultPath: string): string {
 
 function seedDateProperty(notePath: string, value: string): void {
   const content = fs.readFileSync(notePath, 'utf8')
-  fs.writeFileSync(notePath, content.replace('Status: Active\n', `Status: Active\nDate: ${value}\n`))
+  const updatedContent = content.replace(/Status: Active\r?\n/, (match) => (
+    `${match}Date: ${value}${match.endsWith('\r\n') ? '\r\n' : '\n'}`
+  ))
+  if (updatedContent === content) throw new Error('Could not seed Date property in alpha-project fixture')
+  fs.writeFileSync(notePath, updatedContent)
 }
 
 async function calendarDay(page: Page, year: number, monthIndex: number, day: number): Promise<Locator> {
