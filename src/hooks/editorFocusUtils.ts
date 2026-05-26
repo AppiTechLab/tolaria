@@ -1,5 +1,7 @@
 const ROOT_EDITABLE_SELECTOR = '.ProseMirror[contenteditable="true"]'
 const FALLBACK_EDITABLE_SELECTOR = '.bn-editor [contenteditable="true"]'
+const FIRST_HEADING_BLOCK_SELECTOR = '.bn-block-content[data-content-type="heading"]'
+const FIRST_HEADING_INLINE_SELECTOR = `${FIRST_HEADING_BLOCK_SELECTOR} .bn-inline-content`
 const MAX_FOCUS_ATTEMPTS = 12
 const MAX_TITLE_SELECTION_ATTEMPTS = 12
 
@@ -144,6 +146,48 @@ function ensureEditableFocus(): boolean {
   return hasEditableFocus()
 }
 
+function headingSelectionInsideDom(): boolean | null {
+  const firstHeading = document.querySelector<HTMLElement>(FIRST_HEADING_BLOCK_SELECTOR)
+  if (!firstHeading) return null
+
+  const selection = window.getSelection()
+  const anchorNode = selection?.anchorNode ?? null
+  const anchorElement = anchorNode instanceof Element ? anchorNode : anchorNode?.parentElement ?? null
+  return Boolean(selection?.rangeCount && anchorElement && firstHeading.contains(anchorElement))
+}
+
+function trySelectFirstHeadingInDom(): boolean {
+  const headingInline = document.querySelector<HTMLElement>(FIRST_HEADING_INLINE_SELECTOR)
+  const selection = window.getSelection()
+  if (!headingInline || !selection) return false
+
+  const range = document.createRange()
+  range.selectNodeContents(headingInline)
+  if (!(headingInline.textContent ?? '').trim()) {
+    range.collapse(true)
+  }
+
+  selection.removeAllRanges()
+  selection.addRange(range)
+  headingInline.closest<HTMLElement>('[contenteditable="true"]')?.focus()
+
+  return headingSelectionInsideDom() === true
+}
+
+function ensureTitleSelection(editor: FocusableEditor): boolean {
+  if (!ensureEditableFocus()) return false
+
+  const initialDomSelection = headingSelectionInsideDom()
+  if (initialDomSelection === true) return true
+
+  const selectedHeading = trySelectFirstHeading(editor)
+  const domSelectionAfterEditorSelection = headingSelectionInsideDom()
+  if (domSelectionAfterEditorSelection === true) return true
+  if (domSelectionAfterEditorSelection === null) return selectedHeading
+
+  return trySelectFirstHeadingInDom()
+}
+
 function logFocusTiming(t0: number | undefined, label: 'focus' | 'focus+select'): void {
   if (!t0) return
   console.debug(`[perf] createNote → ${label}: ${(performance.now() - t0).toFixed(1)}ms`)
@@ -154,7 +198,7 @@ function selectTitleWithRetries(
   t0: number | undefined,
   attempt = 0,
 ): void {
-  const selectedHeading = ensureEditableFocus() && trySelectFirstHeading(editor)
+  const selectedHeading = ensureTitleSelection(editor)
 
   if (selectedHeading || attempt >= MAX_TITLE_SELECTION_ATTEMPTS) {
     logFocusTiming(t0, 'focus+select')

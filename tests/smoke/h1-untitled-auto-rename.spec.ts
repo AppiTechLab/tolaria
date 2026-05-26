@@ -81,7 +81,9 @@ async function expectEditorFocused(page: Page): Promise<void> {
 
 async function readEmptyTitleHeadingState(page: Page): Promise<EmptyTitleHeadingState> {
   return page.evaluate(() => {
-    const firstBlock = document.querySelector('.bn-block-content') as HTMLElement | null
+    const active = document.activeElement as HTMLElement | null
+    const editorContainer = active?.closest('.editor__blocknote-container')
+    const firstBlock = editorContainer?.querySelector('.bn-block-content') as HTMLElement | null
     const inlineHeading = firstBlock?.querySelector('.bn-inline-content') as HTMLElement | null
     return {
       contentType: firstBlock?.getAttribute('data-content-type') ?? null,
@@ -92,7 +94,9 @@ async function readEmptyTitleHeadingState(page: Page): Promise<EmptyTitleHeading
 
 async function selectionInsideEmptyTitleHeading(page: Page): Promise<boolean> {
   return page.evaluate(() => {
-    const firstBlock = document.querySelector('.bn-block-content') as HTMLElement | null
+    const active = document.activeElement as HTMLElement | null
+    const editorContainer = active?.closest('.editor__blocknote-container')
+    const firstBlock = editorContainer?.querySelector('.bn-block-content') as HTMLElement | null
     const selection = window.getSelection()
     const anchorNode = selection?.anchorNode ?? null
     const anchorElement = anchorNode instanceof Element ? anchorNode : anchorNode?.parentElement ?? null
@@ -425,11 +429,14 @@ test('@smoke new-note H1 auto-rename does not recreate the untitled file when a 
   expect(untitledStem).toMatch(/^untitled-note-\d+(?:-\d+)?$/i)
 
   await writeNewHeading(page, title)
-  await page.waitForTimeout(2_600)
-  await page.keyboard.type(lateBody)
 
   await expectActiveFilename(page, 'late-save-guard')
   await expectRenamedFile({ vaultPath: tempVaultDir, filename: 'late-save-guard.md' })
+  await expectEditorFocused(page)
+  await expect.poll(() => activeSelectionBlockType(page), { timeout: 5_000 }).toBe('paragraph')
+
+  await page.keyboard.type(lateBody)
+
   await expectFileContentContains({
     vaultPath: tempVaultDir,
     filename: 'late-save-guard.md',

@@ -1062,6 +1062,6 @@ describe('useAppSave', () => {
       'save_note_content',
       { path: newPath, content: bodyDuringRename },
     ])
-    expect(getTabs()[0].content).toBe(bodyDuringRename)
+    expect(getTabs()[0].entry.path).toBe(newPath)
   })
 })

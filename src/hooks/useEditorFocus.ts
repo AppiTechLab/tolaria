@@ -4,6 +4,7 @@ import { focusEditorWithRetries, type FocusableEditor } from './editorFocusUtils
 const TAB_SWAP_EVENT_NAME = 'laputa:editor-tab-swapped'
 const FOCUS_EVENT_NAME = 'laputa:focus-editor'
 const SWAP_WAIT_FALLBACK_MS = 250
+const SWAP_WAIT_MAX_MS = 2_000
 
 interface FocusEventDetail {
   t0?: number
@@ -37,12 +38,16 @@ function registerPendingTabFocus(
   }
 
   const fallbackTimer = window.setTimeout(() => {
-    cleanupPending()
     scheduleFocus()
   }, SWAP_WAIT_FALLBACK_MS)
 
+  const maxWaitTimer = window.setTimeout(() => {
+    cleanupPending()
+  }, SWAP_WAIT_MAX_MS)
+
   const cleanupPending = () => {
     window.clearTimeout(fallbackTimer)
+    window.clearTimeout(maxWaitTimer)
     window.removeEventListener(TAB_SWAP_EVENT_NAME, handleTabSwap)
     pendingCleanups.delete(cleanupPending)
   }

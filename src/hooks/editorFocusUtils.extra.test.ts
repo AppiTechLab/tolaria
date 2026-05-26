@@ -83,6 +83,47 @@ describe('editorFocusUtils extra coverage', () => {
     expect(setTextCursorPosition).toHaveBeenCalledWith('title', 'start')
   })
 
+  it('falls back to a DOM title selection when the editor cursor API does not move browser selection', () => {
+    const editable = document.createElement('div')
+    editable.className = 'ProseMirror'
+    editable.contentEditable = 'true'
+    editable.setAttribute('contenteditable', 'true')
+    editable.tabIndex = -1
+    Object.defineProperty(editable, 'isContentEditable', { configurable: true, value: true })
+
+    const headingBlock = document.createElement('div')
+    headingBlock.className = 'bn-block-content'
+    headingBlock.setAttribute('data-content-type', 'heading')
+    const headingInline = document.createElement('div')
+    headingInline.className = 'bn-inline-content'
+    headingBlock.appendChild(headingInline)
+    editable.appendChild(headingBlock)
+    document.body.appendChild(editable)
+
+    const realFocus = HTMLElement.prototype.focus.bind(editable)
+    vi.spyOn(editable, 'focus').mockImplementation(() => realFocus())
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0)
+      return 1
+    })
+
+    const setTextCursorPosition = vi.fn()
+
+    focusEditorWithRetries({
+      focus: vi.fn(),
+      document: [{ id: 'title', type: 'heading', props: { level: 1 }, content: [] }],
+      setTextCursorPosition,
+    }, true, undefined)
+
+    const selection = window.getSelection()
+    const anchorNode = selection?.anchorNode ?? null
+    const anchorElement = anchorNode instanceof Element ? anchorNode : anchorNode?.parentElement ?? null
+
+    expect(setTextCursorPosition).toHaveBeenCalledWith('title', 'start')
+    expect(selection?.rangeCount).toBeGreaterThan(0)
+    expect(anchorElement && headingBlock.contains(anchorElement)).toBe(true)
+  })
+
   it('does not call editor.focus when editable DOM focus already succeeds', () => {
     const editable = document.createElement('div')
     editable.className = 'ProseMirror'

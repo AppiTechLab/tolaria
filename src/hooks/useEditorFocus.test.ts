@@ -113,6 +113,23 @@ describe('useEditorFocus', () => {
     vi.useRealTimers()
   })
 
+  it('focuses again when the matching swap event arrives after the fallback fires', () => {
+    vi.useFakeTimers()
+    const rAF = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0 })
+    const { editor } = setup(true)
+
+    window.dispatchEvent(new CustomEvent('laputa:focus-editor', { detail: { path: '/vault/new-note.md' } }))
+
+    vi.advanceTimersByTime(250)
+    expect(editor.focus).toHaveBeenCalledTimes(1)
+
+    window.dispatchEvent(new CustomEvent('laputa:editor-tab-swapped', { detail: { path: '/vault/new-note.md' } }))
+
+    expect(rAF).toHaveBeenCalledTimes(2)
+    expect(editor.focus).toHaveBeenCalledTimes(1)
+    vi.useRealTimers()
+  })
+
   it('cleans up event listener on unmount', () => {
     const editable = document.createElement('div')
     editable.setAttribute('contenteditable', 'true')

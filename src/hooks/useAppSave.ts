@@ -197,6 +197,7 @@ async function reloadAutoRenamedNote(
     handleSwitchTab,
     replaceEntry,
     loadModifiedFiles,
+    flushLiveEditorContent,
     preferDiskContent = false,
     restoreEditorFocus = false,
   }: {
@@ -208,6 +209,7 @@ async function reloadAutoRenamedNote(
     handleSwitchTab: AppSaveDeps['handleSwitchTab']
     replaceEntry: AppSaveDeps['replaceEntry']
     loadModifiedFiles: AppSaveDeps['loadModifiedFiles']
+    flushLiveEditorContent?: AppSaveDeps['flushLiveEditorContent']
     preferDiskContent?: boolean
     restoreEditorFocus?: boolean
   },
@@ -224,39 +226,13 @@ async function reloadAutoRenamedNote(
         title: extractH1TitleFromContent(optimisticContent) ?? existingTab.entry.title,
       }
     : null
-
-  if (activeTabWasRenamed && optimisticEntry) {
-    startTransition(() => {
-      setTabs((prev: TabState[]) => prev.map((tab) => (
-        tab.entry.path === oldPath
-          ? { entry: optimisticEntry, content: optimisticContent }
-          : tab
-      )))
-      handleSwitchTab(newPath)
-    })
-  }
-
-  const newEntry = await invoke<VaultEntry>('reload_vault_entry', { path: newPath })
-  const diskContent = await invoke<string>('get_note_content', { path: newPath })
-  const preservedContent = preferDiskContent
-    ? diskContent
-    : tabsRef.current.find((tab) => tab.entry.path === newPath || tab.entry.path === oldPath)?.content ?? diskContent
-
   const otherTabPaths = tabsRef.current
     .filter((tab) => tab.entry.path !== oldPath && tab.entry.path !== newPath)
     .map((tab) => tab.entry.path)
 
-  startTransition(() => {
-    setTabs((prev: TabState[]) => prev.map((tab) => (
-      tab.entry.path === oldPath || tab.entry.path === newPath
-        ? { entry: { ...tab.entry, ...newEntry, path: newPath }, content: preservedContent }
-        : tab
-    )))
-    if (!activeTabWasRenamed && activeTabPathRef.current === oldPath) handleSwitchTab(newPath)
-    replaceEntry(oldPath, { ...newEntry, path: newPath }, preservedContent)
-  })
+  const scheduleFocusRecovery = () => {
+    if (!restoreEditorFocus || typeof window === 'undefined') return
 
-  if (restoreEditorFocus && typeof window !== 'undefined') {
     const restoreFocusIfNeeded = () => {
       const activeElement = document.activeElement
       const editorStillHasFocus = activeElement instanceof Element
@@ -284,6 +260,61 @@ async function reloadAutoRenamedNote(
 
     window.addEventListener('laputa:editor-tab-swapped', handleTabSwap)
   }
+
+  if (activeTabWasRenamed && optimisticEntry) {
+    startTransition(() => {
+      setTabs((prev: TabState[]) => prev.map((tab) => (
+        tab.entry.path === oldPath
+          ? { entry: optimisticEntry, content: tab.content }
+          : tab
+      )))
+      handleSwitchTab(newPath)
+      replaceEntry(oldPath, optimisticEntry, optimisticContent)
+    })
+
+    if (flushLiveEditorContent) {
+      const flushRenamedActiveTab = () => flushLiveEditorContent(newPath)
+      if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(() => flushRenamedActiveTab())
+      } else {
+        setTimeout(flushRenamedActiveTab, 0)
+      }
+    }
+
+    scheduleFocusRecovery()
+
+    void Promise.all(otherTabPaths.map(async (path) => {
+      const content = await invoke<string>('get_note_content', { path })
+      startTransition(() => {
+        setTabs((prev: TabState[]) => prev.map((tab) => (
+          tab.entry.path === path ? { ...tab, content } : tab
+        )))
+      })
+    })).finally(() => {
+      startTransition(() => {
+        loadModifiedFiles()
+      })
+    })
+
+    return
+  }
+
+  const newEntry = await invoke<VaultEntry>('reload_vault_entry', { path: newPath })
+  const diskContent = await invoke<string>('get_note_content', { path: newPath })
+  const latestTabContent = tabsRef.current.find((tab) => tab.entry.path === newPath || tab.entry.path === oldPath)?.content ?? optimisticContent
+  const preservedContent = preferDiskContent ? diskContent : latestTabContent || diskContent
+
+  startTransition(() => {
+    setTabs((prev: TabState[]) => prev.map((tab) => (
+      tab.entry.path === oldPath || tab.entry.path === newPath
+        ? { entry: { ...tab.entry, ...newEntry, path: newPath }, content: preservedContent }
+        : tab
+    )))
+    if (!activeTabWasRenamed && activeTabPathRef.current === oldPath) handleSwitchTab(newPath)
+    replaceEntry(oldPath, { ...newEntry, path: newPath }, preservedContent)
+  })
+
+  scheduleFocusRecovery()
 
   void Promise.all(otherTabPaths.map(async (path) => {
     const content = await invoke<string>('get_note_content', { path })
@@ -389,6 +420,7 @@ function useUntitledRenameExecutor({
           handleSwitchTab,
           replaceEntry,
           loadModifiedFiles,
+          flushLiveEditorContent,
           preferDiskContent: persistedLatestContent || persistedRenamedContent,
           restoreEditorFocus,
         })
