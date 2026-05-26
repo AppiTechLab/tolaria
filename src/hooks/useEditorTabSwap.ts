@@ -630,11 +630,51 @@ function currentCursorBlockId(editor: ReturnType<typeof useCreateBlockNote>): st
   }
 }
 
+function currentCursorBlockSnapshot(editor: ReturnType<typeof useCreateBlockNote>): { id: string | null; type: string | null } {
+  const id = currentCursorBlockId(editor)
+  if (!id) return { id: null, type: null }
+
+  const block = Array.isArray(editor.document)
+    ? editor.document.find((candidate) => (
+        typeof candidate === 'object'
+        && candidate !== null
+        && 'id' in candidate
+        && (candidate as { id?: unknown }).id === id
+      )) as { type?: unknown } | undefined
+    : undefined
+
+  return {
+    id,
+    type: typeof block?.type === 'string' ? block.type : null,
+  }
+}
+
+function findFirstParagraphBlockId(editor: ReturnType<typeof useCreateBlockNote>): string | null {
+  if (!Array.isArray(editor.document)) return null
+
+  for (const block of editor.document) {
+    if (
+      typeof block === 'object'
+      && block !== null
+      && (block as { type?: unknown }).type === 'paragraph'
+      && typeof (block as { id?: unknown }).id === 'string'
+      && ((block as { id?: string }).id?.length ?? 0) > 0
+    ) {
+      return (block as { id: string }).id
+    }
+  }
+
+  return null
+}
+
 function restoreCursorBlock(
   editor: ReturnType<typeof useCreateBlockNote>,
-  blockId: string | null,
+  cursorBlock: { id: string | null; type: string | null },
   attempt = 0,
 ): void {
+  const blockId = attempt > 0 && cursorBlock.type === 'paragraph'
+    ? findFirstParagraphBlockId(editor) ?? cursorBlock.id
+    : cursorBlock.id
   if (!blockId) return
 
   const setTextCursorPosition = (editor as {
@@ -653,7 +693,7 @@ function restoreCursorBlock(
   if (currentCursorBlockId(editor) === blockId) return
   if (attempt >= 4) return
 
-  requestNextFrame(() => restoreCursorBlock(editor, blockId, attempt + 1))
+  requestNextFrame(() => restoreCursorBlock(editor, cursorBlock, attempt + 1))
 }
 
 function preserveUntitledRenameState(options: {
@@ -679,7 +719,7 @@ function preserveUntitledRenameState(options: {
 
   if (!prevPath || !activeTabPath) return false
   if (!isUntitledRenameTransition(prevPath, activeTabPath, activeTab, editor)) return false
-  const cursorBlockId = currentCursorBlockId(editor)
+  const cursorBlock = currentCursorBlockSnapshot(editor)
 
   if (pendingLocalContentRef.current?.path === prevPath) {
     pendingLocalContentRef.current = {
@@ -698,7 +738,7 @@ function preserveUntitledRenameState(options: {
     editorContentPathRef,
   })
   requestNextFrame(() => {
-    restoreCursorBlock(editor, cursorBlockId)
+    restoreCursorBlock(editor, cursorBlock)
     signalEditorTabSwapped(activeTabPath)
   })
   return true

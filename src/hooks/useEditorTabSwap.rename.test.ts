@@ -249,6 +249,87 @@ describe('useEditorTabSwap untitled rename continuity', () => {
     await expectWindowsRenameSessionContinues({ renamedTabArrivesLate: true })
   })
 
+  it('falls back to the first paragraph block when an empty paragraph gets a new id during untitled rename', async () => {
+    setupMountedEditorMocks()
+
+    const markdownRef = { current: '# Fresh Title\n\n' }
+    const cursorBlockIdRef = { current: 'body' }
+    const docRef = {
+      current: [
+        {
+          id: 'title',
+          type: 'heading',
+          props: { level: 1 },
+          content: [{ type: 'text', text: 'Fresh Title', styles: {} }],
+        },
+        {
+          id: 'body',
+          type: 'paragraph',
+          content: [],
+        },
+      ] as unknown[],
+    }
+
+    const renamedDocument = [
+      {
+        id: 'title-2',
+        type: 'heading',
+        props: { level: 1 },
+        content: [{ type: 'text', text: 'Fresh Title', styles: {} }],
+      },
+      {
+        id: 'body-2',
+        type: 'paragraph',
+        content: [],
+      },
+    ] as unknown[]
+
+    const editor = {
+      get document() { return docRef.current },
+      get prosemirrorView() { return {} },
+      onMount: (cb: () => void) => { cb(); return () => {} },
+      replaceBlocks: vi.fn(),
+      insertBlocks: vi.fn(),
+      blocksToMarkdownLossy: vi.fn(() => markdownRef.current),
+      blocksToHTMLLossy: vi.fn(() => ''),
+      tryParseMarkdownToBlocks: vi.fn(() => []),
+      getTextCursorPosition: vi.fn(() => ({ block: { id: cursorBlockIdRef.current } })),
+      setTextCursorPosition: vi.fn((blockId: string) => {
+        if (blockId === 'body') {
+          docRef.current = renamedDocument
+          cursorBlockIdRef.current = 'title-2'
+          return
+        }
+
+        cursorBlockIdRef.current = blockId
+      }),
+      focus: vi.fn(),
+      _tiptapEditor: { commands: { setContent: vi.fn() } },
+    }
+
+    const untitledTab = makeTab('untitled-note-123.md', 'Untitled Note 123', '')
+    const renamedTab = makeTab('fresh-title.md', 'Fresh Title', '')
+
+    const { rerender } = renderHook(
+      ({ tabs, activeTabPath }) => useEditorTabSwap({
+        tabs,
+        activeTabPath,
+        editor: editor as never,
+      }),
+      { initialProps: { tabs: [untitledTab], activeTabPath: untitledTab.entry.path } },
+    )
+
+    await act(() => new Promise(r => setTimeout(r, 0)))
+
+    rerender({ tabs: [renamedTab], activeTabPath: renamedTab.entry.path })
+    await act(() => new Promise(r => setTimeout(r, 0)))
+    await act(() => new Promise(r => setTimeout(r, 0)))
+
+    expect(editor.setTextCursorPosition).toHaveBeenCalledWith('body', 'end')
+    expect(editor.setTextCursorPosition).toHaveBeenCalledWith('body-2', 'end')
+    expect(cursorBlockIdRef.current).toBe('body-2')
+  })
+
   it('does not re-swap the active note when app state catches up with live typing', async () => {
     setupMountedEditorMocks()
 
