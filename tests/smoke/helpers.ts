@@ -12,6 +12,15 @@ async function isVisible(page: Page, selector: string): Promise<boolean> {
   }
 }
 
+async function waitForVisible(page: Page, selector: string, timeout = 750): Promise<boolean> {
+  try {
+    await page.locator(selector).waitFor({ state: 'visible', timeout })
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function dispatchBrowserMenuCommand(page: Page, id: string): Promise<boolean> {
   return page.evaluate((commandId) => {
     const dispatch = window.__laputaTest?.dispatchBrowserMenuCommand
@@ -26,14 +35,23 @@ export async function openCommandPalette(page: Page): Promise<void> {
 
   await page.locator('body').click()
   const openedFromMenuBridge = await dispatchBrowserMenuCommand(page, 'view-command-palette')
-  if (!openedFromMenuBridge) {
-    await sendShortcut(page, 'k', ['Control'])
+  if (openedFromMenuBridge && await waitForVisible(page, COMMAND_INPUT)) {
+    return
   }
 
-  if (await isVisible(page, COMMAND_INPUT)) return
+  if (!openedFromMenuBridge) {
+    await sendShortcut(page, 'k', ['Control'])
+    if (await waitForVisible(page, COMMAND_INPUT)) return
+  }
 
   await page.keyboard.press('Escape').catch(() => {})
   await page.locator('body').click()
+
+  if (openedFromMenuBridge) {
+    await dispatchBrowserMenuCommand(page, 'view-command-palette')
+    if (await waitForVisible(page, COMMAND_INPUT, 1_000)) return
+  }
+
   await sendShortcut(page, 'k', ['Control'])
   await expect(page.locator(COMMAND_INPUT)).toBeVisible()
 }
