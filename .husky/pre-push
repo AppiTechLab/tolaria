@@ -64,32 +64,36 @@ ensure_node_tooling() {
   fi
 }
 
-require_main_push() {
+require_current_branch_push() {
   if ! git symbolic-ref -q HEAD >/dev/null 2>&1; then
-    echo "❌ Pushes must happen from main. Detached HEAD is not allowed."
+    echo "❌ Pushes from a detached HEAD are not allowed."
     exit 1
   fi
 
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-  if [ "$CURRENT_BRANCH" != "main" ]; then
-    echo "❌ Pushes must happen from main. Current branch: $CURRENT_BRANCH"
-    exit 1
-  fi
+  CURRENT_REF="refs/heads/$CURRENT_BRANCH"
 
   while IFS=' ' read -r LOCAL_REF LOCAL_SHA REMOTE_REF REMOTE_SHA; do
     [ -z "$LOCAL_REF" ] && continue
 
+    if [ "$LOCAL_REF" = "$CURRENT_REF" ] && [ "$REMOTE_REF" = "$CURRENT_REF" ]; then
+      continue
+    fi
+
+    if [ "$LOCAL_REF" = "HEAD" ] && [ "$REMOTE_REF" = "$CURRENT_REF" ]; then
+      continue
+    fi
+
     case "$LOCAL_REF:$REMOTE_REF" in
-      refs/heads/main:refs/heads/main)
-        ;;
       refs/tags/*:refs/tags/*)
-        ;;
-      *)
-        echo "❌ Pushes must be main -> main only."
-        echo "   Attempted: ${LOCAL_REF:-<none>} -> ${REMOTE_REF:-<none>}"
-        exit 1
+        continue
         ;;
     esac
+
+    echo "❌ Pushes must target the checked-out branch or a same-name tag."
+    echo "   Current branch: $CURRENT_BRANCH"
+    echo "   Attempted: ${LOCAL_REF:-<none>} -> ${REMOTE_REF:-<none>}"
+    exit 1
   done <<EOF
 $PUSH_INPUT
 EOF
@@ -100,7 +104,7 @@ if [ -t 0 ]; then
 else
   PUSH_INPUT=$(cat)
 fi
-require_main_push
+require_current_branch_push
 ensure_node_tooling
 ensure_cargo_tooling
 
